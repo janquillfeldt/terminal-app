@@ -1,0 +1,51 @@
+[package]
+name = "termix"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+crossterm = "0.26"  # For cross-platform terminal handling
+serde = { version = "1.0", features = ["derive"] }  # For serialization and deserialization
+toml = "0.5"  # For configuration file handling
+anyhow = "1"
+
+[features]
+# Default to terminal UI only; GUI can be enabled with `--features gui`
+default = ["tui"]
+tui = []
+gui = ["dep:eframe", "dep:portable-pty", "dep:vt100", "dep:pulldown-cmark", "dep:rfd", "dep:ssh2"]
+
+[dependencies.eframe]
+version = "0.27"
+optional = true
+default-features = true
+
+[dependencies.rustc_version_runtime]
+version = "0.3"
+
+# Embedded PTY terminal in GUI
+[dependencies.portable-pty]
+version = "0.8"
+optional = true
+
+[dependencies.vt100]
+version = "0.15"
+optional = true
+
+[dependencies.pulldown-cmark]
+version = "0.9"
+optional = true
+
+[dependencies.rfd]
+version = "0.15"
+optional = true
+
+[dependencies.ssh2]
+version = "0.9"
+optional = true
+
+[profile.dev]
+opt-level = 0
+
+[profile.release]
+opt-level = 3
