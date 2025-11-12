@@ -716,6 +716,17 @@ impl App for GuiApp {
                     ui.label("• Terminal: portable-pty + vt100");
                     ui.label("• SSH: ssh2");
                     ui.label("• Markdown: pulldown-cmark");
+                    ui.add_space(10.0);
+                    ui.separator();
+                    ui.heading("Support:");
+                    ui.label("Wenn du TermiX nützlich findest, unterstütze die Entwicklung:");
+                    ui.add_space(5.0);
+                    ui.horizontal(|ui| {
+                        ui.label("☕");
+                        if ui.hyperlink_to("Buy Me a Coffee", "https://buymeacoffee.com/janquillfeldt").clicked() {
+                            // Link opens in browser automatically
+                        }
+                    });
                 }
                 5 => {
                     ui.heading("Beenden");
