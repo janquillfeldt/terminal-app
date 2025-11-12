@@ -278,7 +278,7 @@ impl App for GuiApp {
 
         egui::TopBottomPanel::top("top").show(ctx, |ui| {
             ui.horizontal_wrapped(|ui| {
-                ui.heading("Portable Terminal Application");
+                ui.heading("TermiX");
                 ui.label(egui::RichText::new(" • GUI").color(egui::Color32::LIGHT_BLUE));
                 ui.separator();
                 ui.label("Modus:");
@@ -813,11 +813,11 @@ pub fn run_gui() -> eframe::Result<()> {
         viewport: egui::ViewportBuilder::default()
             .with_inner_size([900.0, 600.0])
             .with_min_inner_size([640.0, 420.0])
-            .with_title("Portable Terminal Application GUI"),
+            .with_title("TermiX"),
         ..Default::default()
     };
     eframe::run_native(
-        "Portable Terminal Application GUI",
+        "TermiX",
         options,
         Box::new(|_cc| Box::new(GuiApp::default())),
     )

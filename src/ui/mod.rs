@@ -67,8 +67,8 @@ impl UI {
         )?;
         
         let header = "═══════════════════════════════════════════════════════════════════════════════";
-        writeln!(stdout, "{}", header)?;
-        writeln!(stdout, "                     🖥️  PORTABLE TERMINAL APPLICATION                        ")?;
+    writeln!(stdout, "{}", header)?;
+    writeln!(stdout, "                                 🖥️  TermiX                                  ")?;
         writeln!(stdout, "{}", header)?;
         execute!(stdout, ResetColor)?;
         writeln!(stdout)?;
@@ -213,7 +213,7 @@ impl UI {
                 writeln!(stdout, "\n  ℹ️  ÜBER DIESE ANWENDUNG")?;
                 writeln!(stdout, "  ═══════════════════════════════════")?;
                 execute!(stdout, ResetColor)?;
-                writeln!(stdout, "\n  Portable Terminal Application v0.1.0")?;
+                writeln!(stdout, "\n  TermiX v0.1.0")?;
                 writeln!(stdout, "  Läuft auf: Linux & Windows")?;
                 writeln!(stdout, "  Entwickelt mit Rust & Crossterm")?;
                 writeln!(stdout, "\n  Drücke eine beliebige Taste zum Fortfahren...")?;
