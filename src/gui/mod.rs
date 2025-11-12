@@ -304,17 +304,15 @@ impl App for GuiApp {
             });
             ui.separator();
             
-            // Menu items with icons
-            let items = [
-                ("💻", "Terminal", egui::Color32::from_rgb(0, 200, 120)),
-                ("🔌", "SSH", egui::Color32::from_rgb(100, 150, 255)),
-                ("📝", "Markdown", egui::Color32::from_rgb(255, 150, 50)),
-                ("⚙", "Einstellungen", egui::Color32::YELLOW),  // Einfacheres Zahnrad-Symbol
-                ("ℹ", "Über", egui::Color32::LIGHT_BLUE),  // Einfacheres Info-Symbol
-                ("🚪", "Beenden", egui::Color32::LIGHT_RED),
+            // Menu items with icons (top items)
+            let top_items = [
+                ("💻", "Terminal", egui::Color32::from_rgb(0, 200, 120), 0),
+                ("🔌", "SSH", egui::Color32::from_rgb(100, 150, 255), 1),
+                ("📝", "Markdown", egui::Color32::from_rgb(255, 150, 50), 2),
+                ("⚙", "Einstellungen", egui::Color32::YELLOW, 3),
             ];
             
-            for (i, (icon, label, color)) in items.iter().enumerate() {
+            for (icon, label, color, idx) in top_items.iter() {
                 let button_text = if self.sidebar_collapsed {
                     egui::RichText::new(*icon).size(24.0).color(*color)
                 } else {
@@ -329,23 +327,68 @@ impl App for GuiApp {
                 };
                 
                 if ui.add_sized(button_size, button).clicked() {
-                    self.selected = i;
+                    self.selected = *idx;
                 }
                 
-                if self.selected == i && !self.sidebar_collapsed {
+                if self.selected == *idx && !self.sidebar_collapsed {
                     ui.colored_label(egui::Color32::from_gray(140), "◀ aktiv");
                 }
                 
                 ui.separator();
             }
             
-            // Collapse hint at bottom
-            if !self.sidebar_collapsed {
-                ui.with_layout(egui::Layout::bottom_up(egui::Align::Center), |ui| {
+            // Bottom items (fixed at bottom)
+            ui.with_layout(egui::Layout::bottom_up(egui::Align::Center), |ui| {
+                // Collapse hint
+                if !self.sidebar_collapsed {
                     ui.add_space(5.0);
                     ui.colored_label(egui::Color32::GRAY, "◀ Klicke zum Einklappen");
-                });
-            }
+                    ui.add_space(10.0);
+                }
+                
+                // Beenden button
+                let beenden_text = if self.sidebar_collapsed {
+                    egui::RichText::new("🚪").size(24.0).color(egui::Color32::LIGHT_RED)
+                } else {
+                    egui::RichText::new("🚪 Beenden").color(egui::Color32::LIGHT_RED)
+                };
+                let beenden_button = egui::Button::new(beenden_text);
+                let beenden_size = if self.sidebar_collapsed {
+                    [50.0, 40.0]
+                } else {
+                    [200.0, 35.0]
+                };
+                
+                ui.separator();
+                if ui.add_sized(beenden_size, beenden_button).clicked() {
+                    self.selected = 5;
+                }
+                if self.selected == 5 && !self.sidebar_collapsed {
+                    ui.colored_label(egui::Color32::from_gray(140), "◀ aktiv");
+                }
+                
+                ui.separator();
+                
+                // Über button
+                let ueber_text = if self.sidebar_collapsed {
+                    egui::RichText::new("ℹ").size(24.0).color(egui::Color32::LIGHT_BLUE)
+                } else {
+                    egui::RichText::new("ℹ Über").color(egui::Color32::LIGHT_BLUE)
+                };
+                let ueber_button = egui::Button::new(ueber_text);
+                let ueber_size = if self.sidebar_collapsed {
+                    [50.0, 40.0]
+                } else {
+                    [200.0, 35.0]
+                };
+                
+                if ui.add_sized(ueber_size, ueber_button).clicked() {
+                    self.selected = 4;
+                }
+                if self.selected == 4 && !self.sidebar_collapsed {
+                    ui.colored_label(egui::Color32::from_gray(140), "◀ aktiv");
+                }
+            });
         });
 
         egui::CentralPanel::default().show(ctx, |ui| {
