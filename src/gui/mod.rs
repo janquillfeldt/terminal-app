@@ -129,6 +129,7 @@ pub struct GuiApp {
     terminal_text_color: egui::Color32,
     markdown_text_color: egui::Color32,
     ssh_text_color: egui::Color32,
+    cursor_color: egui::Color32,
     font_mode: FontMode,
     custom_font_info: Option<String>,
     // Sidebar state
@@ -176,6 +177,7 @@ impl Default for GuiApp {
             terminal_text_color: egui::Color32::from_rgb(220, 220, 220),
             markdown_text_color: egui::Color32::from_rgb(220, 220, 220),
             ssh_text_color: egui::Color32::from_rgb(200, 220, 255),
+            cursor_color: egui::Color32::from_rgb(0, 255, 0),
             font_mode: FontMode::Default,
             custom_font_info: None,
             sidebar_collapsed: false,
@@ -312,6 +314,7 @@ impl App for GuiApp {
                         if ui.button("➕ Neues Terminal").clicked() {
                             if let Ok(mut term) = TerminalView::new() {
                                 term.text_color = self.terminal_text_color;
+                                term.cursor_color = self.cursor_color;
                                 self.terminals.push(TerminalTab {
                                     name: format!("Terminal {}", self.terminals.len() + 1),
                                     terminal: term,
@@ -332,8 +335,9 @@ impl App for GuiApp {
                     
                     // Active terminal
                     if let Some(tab) = self.terminals.get_mut(self.active_terminal_tab) {
-                        // Ensure terminal respects current color if changed elsewhere
+                        // Ensure terminal respects current colors if changed elsewhere
                         tab.terminal.text_color = self.terminal_text_color;
+                        tab.terminal.cursor_color = self.cursor_color;
                         tab.terminal.ui(ui);
                     } else {
                         ui.colored_label(egui::Color32::RED, "Kein Terminal verfügbar.");
@@ -451,6 +455,17 @@ impl App for GuiApp {
                         ui.horizontal(|ui| {
                             ui.label("SSH Textfarbe:");
                             ui.color_edit_button_srgba(&mut self.ssh_text_color);
+                        });
+                        ui.horizontal(|ui| {
+                            ui.label("Cursor Farbe:");
+                            let mut c = self.cursor_color;
+                            if ui.color_edit_button_srgba(&mut c).changed() {
+                                self.cursor_color = c;
+                                // Apply to all terminal tabs
+                                for t in &mut self.terminals {
+                                    t.terminal.cursor_color = c;
+                                }
+                            }
                         });
                     });
 
@@ -591,6 +606,7 @@ struct TerminalView {
     show_suggestions: bool,
     // Appearance
     text_color: egui::Color32,
+    cursor_color: egui::Color32,
 }
 
 // Common shell commands for suggestions
@@ -678,6 +694,7 @@ impl TerminalView {
             selected_suggestion: 0,
             show_suggestions: false,
             text_color: egui::Color32::from_rgb(220, 220, 220),
+            cursor_color: egui::Color32::from_rgb(0, 255, 0),
         })
     }
 
@@ -759,7 +776,7 @@ impl TerminalView {
                     ui.colored_label(egui::Color32::from_rgb(150, 150, 150), "[Terminal bereit - tippe einen Befehl]");
                     // Show cursor at start
                     ui.horizontal(|ui| {
-                        ui.colored_label(egui::Color32::from_rgb(0, 255, 0), "█");
+                        ui.colored_label(self.cursor_color, "█");
                     });
                 } else {
                     // Render each line with cursor overlay
@@ -776,9 +793,9 @@ impl TerminalView {
                                         egui::RichText::new(&before).monospace());
                                 }
                                 
-                                // Render green cursor (no blinking) at display_col
+                                // Render cursor (no blinking) at display_col
                                 let cursor_char = chars.get(display_col as usize).unwrap_or(&' ');
-                                ui.colored_label(egui::Color32::from_rgb(0, 255, 0), 
+                                ui.colored_label(self.cursor_color, 
                                     format!("{}", if *cursor_char == ' ' { '█' } else { *cursor_char }));
                                 
                                 // Render characters after cursor in chosen color
