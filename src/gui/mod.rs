@@ -112,6 +112,53 @@ enum FontMode {
 }
 
 #[cfg(feature = "gui")]
+#[derive(Clone, Copy, PartialEq)]
+enum CursorShape {
+    Block,          // █
+    Underline,      // _
+    VerticalBar,    // |
+    DoubleUnderscore, // ‗ (thick underline)
+    Box,            // ▯ (hollow block)
+    Cross,          // ╳
+}
+
+#[cfg(feature = "gui")]
+impl CursorShape {
+    fn name(&self) -> &str {
+        match self {
+            CursorShape::Block => "Block █",
+            CursorShape::Underline => "Unterstrich _",
+            CursorShape::VerticalBar => "Strich |",
+            CursorShape::DoubleUnderscore => "Doppelunterstrich ‗",
+            CursorShape::Box => "Kasten ▯",
+            CursorShape::Cross => "Kreuz ╳",
+        }
+    }
+    
+    fn all() -> Vec<CursorShape> {
+        vec![
+            CursorShape::Block,
+            CursorShape::Underline,
+            CursorShape::VerticalBar,
+            CursorShape::DoubleUnderscore,
+            CursorShape::Box,
+            CursorShape::Cross,
+        ]
+    }
+    
+    fn render(&self, c: char) -> String {
+        match self {
+            CursorShape::Block => format!("{}", if c == ' ' { '█' } else { c }),
+            CursorShape::Underline => "_".to_string(),
+            CursorShape::VerticalBar => "|".to_string(),
+            CursorShape::DoubleUnderscore => "‗".to_string(),
+            CursorShape::Box => "▯".to_string(),
+            CursorShape::Cross => "╳".to_string(),
+        }
+    }
+}
+
+#[cfg(feature = "gui")]
 pub struct GuiApp {
     selected: usize,
     // Multiple terminals with tabs
@@ -130,12 +177,15 @@ pub struct GuiApp {
     markdown_text_color: egui::Color32,
     ssh_text_color: egui::Color32,
     cursor_color: egui::Color32,
+    cursor_shape: CursorShape,
+    cursor_blinking: bool,
     font_mode: FontMode,
     custom_font_info: Option<String>,
     // Sidebar state
     sidebar_collapsed: bool,
     // Rename dialogs
     terminal_rename_dialog: Option<(usize, String)>, // (tab_index, new_name)
+    markdown_rename_dialog: Option<(usize, String)>, // (tab_index, new_name)
 }
 
 #[cfg(feature = "gui")]
@@ -180,10 +230,13 @@ impl Default for GuiApp {
             markdown_text_color: egui::Color32::from_rgb(220, 220, 220),
             ssh_text_color: egui::Color32::from_rgb(200, 220, 255),
             cursor_color: egui::Color32::from_rgb(0, 255, 0),
+            cursor_shape: CursorShape::Block,
+            cursor_blinking: false,
             font_mode: FontMode::Default,
             custom_font_info: None,
             sidebar_collapsed: false,
             terminal_rename_dialog: None,
+            markdown_rename_dialog: None,
         }
     }
 }
@@ -322,6 +375,8 @@ impl App for GuiApp {
                             if let Ok(mut term) = TerminalView::new() {
                                 term.text_color = self.terminal_text_color;
                                 term.cursor_color = self.cursor_color;
+                                term.cursor_shape = self.cursor_shape;
+                                term.cursor_blinking = self.cursor_blinking;
                                 self.terminals.push(TerminalTab {
                                     name: format!("Terminal {}", self.terminals.len() + 1),
                                     terminal: term,
@@ -346,9 +401,11 @@ impl App for GuiApp {
                     
                     // Active terminal
                     if let Some(tab) = self.terminals.get_mut(self.active_terminal_tab) {
-                        // Ensure terminal respects current colors if changed elsewhere
+                        // Ensure terminal respects current settings if changed elsewhere
                         tab.terminal.text_color = self.terminal_text_color;
                         tab.terminal.cursor_color = self.cursor_color;
+                        tab.terminal.cursor_shape = self.cursor_shape;
+                        tab.terminal.cursor_blinking = self.cursor_blinking;
                         tab.terminal.ui(ui);
                     } else {
                         ui.colored_label(egui::Color32::RED, "Kein Terminal verfügbar.");
@@ -368,10 +425,14 @@ impl App for GuiApp {
                     // Tab bar for markdown editors
                     ui.horizontal(|ui| {
                         let mut to_close = None;
+                        let mut to_rename = None;
                         for (idx, tab) in self.markdown_editors.iter().enumerate() {
                             let selected = idx == self.active_markdown_tab;
                             if ui.selectable_label(selected, &tab.name).clicked() {
                                 self.active_markdown_tab = idx;
+                            }
+                            if ui.small_button("✏").on_hover_text("Umbenennen").clicked() {
+                                to_rename = Some(idx);
                             }
                             if ui.small_button("✕").clicked() && self.markdown_editors.len() > 1 {
                                 to_close = Some(idx);
@@ -384,6 +445,10 @@ impl App for GuiApp {
                                 editor: MarkdownEditor::default(),
                             });
                             self.active_markdown_tab = self.markdown_editors.len() - 1;
+                        }
+                        
+                        if let Some(idx) = to_rename {
+                            self.markdown_rename_dialog = Some((idx, self.markdown_editors[idx].name.clone()));
                         }
                         
                         if let Some(idx) = to_close {
@@ -475,6 +540,43 @@ impl App for GuiApp {
                                 // Apply to all terminal tabs
                                 for t in &mut self.terminals {
                                     t.terminal.cursor_color = c;
+                                }
+                            }
+                        });
+                    });
+
+                    ui.add_space(15.0);
+                    ui.separator();
+                    ui.add_space(10.0);
+
+                    // Cursor settings
+                    ui.group(|ui| {
+                        ui.label(egui::RichText::new("Cursor Einstellungen:").strong());
+                        ui.add_space(6.0);
+                        ui.horizontal(|ui| {
+                            ui.label("Cursor Form:");
+                            egui::ComboBox::from_id_source("cursor_shape")
+                                .selected_text(self.cursor_shape.name())
+                                .show_ui(ui, |ui| {
+                                    for shape in CursorShape::all() {
+                                        let selected = self.cursor_shape == shape;
+                                        if ui.selectable_label(selected, shape.name()).clicked() {
+                                            self.cursor_shape = shape;
+                                            // Apply to all terminal tabs
+                                            for t in &mut self.terminals {
+                                                t.terminal.cursor_shape = shape;
+                                            }
+                                        }
+                                    }
+                                });
+                        });
+                        ui.horizontal(|ui| {
+                            let mut blink = self.cursor_blinking;
+                            if ui.checkbox(&mut blink, "Cursor blinken").changed() {
+                                self.cursor_blinking = blink;
+                                // Apply to all terminal tabs
+                                for t in &mut self.terminals {
+                                    t.terminal.cursor_blinking = blink;
                                 }
                             }
                         });
@@ -611,6 +713,35 @@ impl App for GuiApp {
         if close_rename_dialog {
             self.terminal_rename_dialog = None;
         }
+
+        // Markdown rename dialog
+        let mut close_markdown_rename_dialog = false;
+        if let Some((idx, ref mut new_name)) = self.markdown_rename_dialog {
+            egui::Window::new("Markdown-Dokument umbenennen")
+                .collapsible(false)
+                .resizable(false)
+                .show(ctx, |ui| {
+                    ui.horizontal(|ui| {
+                        ui.label("Neuer Name:");
+                        ui.text_edit_singleline(new_name);
+                    });
+                    ui.separator();
+                    ui.horizontal(|ui| {
+                        if ui.button("✓ Speichern").clicked() {
+                            if idx < self.markdown_editors.len() {
+                                self.markdown_editors[idx].name = new_name.clone();
+                            }
+                            close_markdown_rename_dialog = true;
+                        }
+                        if ui.button("✗ Abbrechen").clicked() {
+                            close_markdown_rename_dialog = true;
+                        }
+                    });
+                });
+        }
+        if close_markdown_rename_dialog {
+            self.markdown_rename_dialog = None;
+        }
     }
 }
 
@@ -647,6 +778,10 @@ struct TerminalView {
     // Appearance
     text_color: egui::Color32,
     cursor_color: egui::Color32,
+    cursor_shape: CursorShape,
+    cursor_blinking: bool,
+    cursor_visible: bool, // for blink state
+    last_blink_time: f64,
 }
 
 // Common shell commands for suggestions
@@ -735,6 +870,10 @@ impl TerminalView {
             show_suggestions: false,
             text_color: egui::Color32::from_rgb(220, 220, 220),
             cursor_color: egui::Color32::from_rgb(0, 255, 0),
+            cursor_shape: CursorShape::Block,
+            cursor_blinking: false,
+            cursor_visible: true,
+            last_blink_time: 0.0,
         })
     }
 
@@ -779,6 +918,18 @@ impl TerminalView {
             self.parser.process(&chunk); 
         }
 
+        // Handle cursor blinking
+        if self.cursor_blinking {
+            let current_time = ui.input(|i| i.time);
+            if current_time - self.last_blink_time > 0.5 {
+                self.cursor_visible = !self.cursor_visible;
+                self.last_blink_time = current_time;
+            }
+            ui.ctx().request_repaint_after(std::time::Duration::from_millis(500));
+        } else {
+            self.cursor_visible = true;
+        }
+
         // Request repaint to show updates
         ui.ctx().request_repaint();
 
@@ -815,9 +966,11 @@ impl TerminalView {
                 if lines.is_empty() {
                     ui.colored_label(egui::Color32::from_rgb(150, 150, 150), "[Terminal bereit - tippe einen Befehl]");
                     // Show cursor at start
-                    ui.horizontal(|ui| {
-                        ui.colored_label(self.cursor_color, "█");
-                    });
+                    if self.cursor_visible {
+                        ui.horizontal(|ui| {
+                            ui.colored_label(self.cursor_color, self.cursor_shape.render(' '));
+                        });
+                    }
                 } else {
                     // Render each line with cursor overlay
                     for (row_idx, line) in lines.iter().enumerate() {
@@ -833,10 +986,19 @@ impl TerminalView {
                                         egui::RichText::new(&before).monospace());
                                 }
                                 
-                                // Render cursor (no blinking) at display_col
-                                let cursor_char = chars.get(display_col as usize).unwrap_or(&' ');
-                                ui.colored_label(self.cursor_color, 
-                                    format!("{}", if *cursor_char == ' ' { '█' } else { *cursor_char }));
+                                // Render cursor with chosen shape
+                                if self.cursor_visible {
+                                    let cursor_char = chars.get(display_col as usize).unwrap_or(&' ');
+                                    ui.colored_label(self.cursor_color, 
+                                        self.cursor_shape.render(*cursor_char));
+                                } else {
+                                    // When cursor is hidden during blink, show space
+                                    let cursor_char = chars.get(display_col as usize).unwrap_or(&' ');
+                                    if *cursor_char != ' ' {
+                                        ui.colored_label(self.text_color, 
+                                            egui::RichText::new(format!("{}", cursor_char)).monospace());
+                                    }
+                                }
                                 
                                 // Render characters after cursor in chosen color
                                 if (display_col as usize) < chars.len().saturating_sub(1) {
