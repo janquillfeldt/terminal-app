@@ -134,6 +134,8 @@ pub struct GuiApp {
     custom_font_info: Option<String>,
     // Sidebar state
     sidebar_collapsed: bool,
+    // Rename dialogs
+    terminal_rename_dialog: Option<(usize, String)>, // (tab_index, new_name)
 }
 
 #[cfg(feature = "gui")]
@@ -181,6 +183,7 @@ impl Default for GuiApp {
             font_mode: FontMode::Default,
             custom_font_info: None,
             sidebar_collapsed: false,
+            terminal_rename_dialog: None,
         }
     }
 }
@@ -301,10 +304,14 @@ impl App for GuiApp {
                     // Tab bar for terminals
                     ui.horizontal(|ui| {
                         let mut to_close = None;
+                        let mut to_rename = None;
                         for (idx, tab) in self.terminals.iter().enumerate() {
                             let selected = idx == self.active_terminal_tab;
                             if ui.selectable_label(selected, &tab.name).clicked() {
                                 self.active_terminal_tab = idx;
+                            }
+                            if ui.small_button("✏").on_hover_text("Umbenennen").clicked() {
+                                to_rename = Some(idx);
                             }
                             if ui.small_button("✕").clicked() && self.terminals.len() > 1 {
                                 to_close = Some(idx);
@@ -321,6 +328,10 @@ impl App for GuiApp {
                                 });
                                 self.active_terminal_tab = self.terminals.len() - 1;
                             }
+                        }
+                        
+                        if let Some(idx) = to_rename {
+                            self.terminal_rename_dialog = Some((idx, self.terminals[idx].name.clone()));
                         }
                         
                         if let Some(idx) = to_close {
@@ -571,6 +582,35 @@ impl App for GuiApp {
                 _ => {}
             }
         });
+
+        // Terminal rename dialog
+        let mut close_rename_dialog = false;
+        if let Some((idx, ref mut new_name)) = self.terminal_rename_dialog {
+            egui::Window::new("Terminal umbenennen")
+                .collapsible(false)
+                .resizable(false)
+                .show(ctx, |ui| {
+                    ui.horizontal(|ui| {
+                        ui.label("Neuer Name:");
+                        ui.text_edit_singleline(new_name);
+                    });
+                    ui.separator();
+                    ui.horizontal(|ui| {
+                        if ui.button("✓ Speichern").clicked() {
+                            if idx < self.terminals.len() {
+                                self.terminals[idx].name = new_name.clone();
+                            }
+                            close_rename_dialog = true;
+                        }
+                        if ui.button("✗ Abbrechen").clicked() {
+                            close_rename_dialog = true;
+                        }
+                    });
+                });
+        }
+        if close_rename_dialog {
+            self.terminal_rename_dialog = None;
+        }
     }
 }
 
@@ -1052,6 +1092,8 @@ struct SshManager {
     show_add_dialog: bool,
     #[serde(skip)]
     status_message: String,
+    #[serde(skip)]
+    rename_dialog: Option<(usize, String)>, // (connection_index, new_name)
 }
 
 #[cfg(feature = "gui")]
@@ -1139,6 +1181,7 @@ impl SshManager {
 
         let mut to_remove = None;
         let mut to_connect = None;
+        let mut to_rename = None;
 
         for (idx, conn) in self.connections.iter().enumerate() {
             ui.group(|ui| {
@@ -1152,12 +1195,19 @@ impl SshManager {
                     if ui.button("🔌 Verbinden").clicked() {
                         to_connect = Some(idx);
                     }
+                    if ui.button("✏ Umbenennen").clicked() {
+                        to_rename = Some(idx);
+                    }
                     if ui.button("🗑 Löschen").clicked() {
                         to_remove = Some(idx);
                     }
                 });
             });
             ui.separator();
+        }
+
+        if let Some(idx) = to_rename {
+            self.rename_dialog = Some((idx, self.connections[idx].name.clone()));
         }
 
         if let Some(idx) = to_remove {
@@ -1175,6 +1225,40 @@ impl SshManager {
 
         if self.connections.is_empty() {
             ui.colored_label(egui::Color32::GRAY, "Keine SSH Verbindungen gespeichert. Klicke auf '➕ Neue SSH Verbindung' um eine hinzuzufügen.");
+        }
+
+        // Rename dialog
+        let mut close_rename_dialog = false;
+        let mut new_status_message = None;
+        if let Some((idx, ref mut new_name)) = self.rename_dialog {
+            egui::Window::new("SSH Verbindung umbenennen")
+                .collapsible(false)
+                .resizable(false)
+                .show(ui.ctx(), |ui| {
+                    ui.horizontal(|ui| {
+                        ui.label("Neuer Name:");
+                        ui.text_edit_singleline(new_name);
+                    });
+                    ui.separator();
+                    ui.horizontal(|ui| {
+                        if ui.button("✓ Speichern").clicked() {
+                            if idx < self.connections.len() {
+                                self.connections[idx].name = new_name.clone();
+                                new_status_message = Some(format!("Verbindung umbenannt zu '{}'", new_name));
+                            }
+                            close_rename_dialog = true;
+                        }
+                        if ui.button("✗ Abbrechen").clicked() {
+                            close_rename_dialog = true;
+                        }
+                    });
+                });
+        }
+        if close_rename_dialog {
+            self.rename_dialog = None;
+        }
+        if let Some(msg) = new_status_message {
+            self.status_message = msg;
         }
     }
 }
