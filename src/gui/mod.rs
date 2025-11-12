@@ -721,12 +721,20 @@ impl App for GuiApp {
                     ui.heading("Support:");
                     ui.label("Wenn du TermiX nützlich findest, unterstütze die Entwicklung:");
                     ui.add_space(5.0);
-                    ui.horizontal(|ui| {
-                        ui.label("☕");
-                        if ui.hyperlink_to("Buy Me a Coffee", "https://buymeacoffee.com/janquillfeldt").clicked() {
-                            // Link opens in browser automatically
-                        }
-                    });
+                    
+                    // Buy Me a Coffee styled button
+                    let button_text = egui::RichText::new("☕ Buy me a coffee")
+                        .color(egui::Color32::BLACK)
+                        .size(16.0);
+                    
+                    let button = egui::Button::new(button_text)
+                        .fill(egui::Color32::from_rgb(255, 221, 0)) // #FFDD00
+                        .stroke(egui::Stroke::new(2.0, egui::Color32::BLACK))
+                        .rounding(egui::Rounding::same(8.0));
+                    
+                    if ui.add_sized([200.0, 40.0], button).on_hover_text("Öffnet buymeacoffee.com/janquillfeldt").clicked() {
+                        let _ = open::that("https://buymeacoffee.com/janquillfeldt");
+                    }
                 }
                 5 => {
                     ui.heading("Beenden");
