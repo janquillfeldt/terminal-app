@@ -104,6 +104,14 @@ impl Theme {
 }
 
 #[cfg(feature = "gui")]
+#[derive(Clone)]
+enum FontMode {
+    Default,
+    MonospaceEverywhere,
+    Custom(String), // name or info
+}
+
+#[cfg(feature = "gui")]
 pub struct GuiApp {
     selected: usize,
     // Multiple terminals with tabs
@@ -117,6 +125,12 @@ pub struct GuiApp {
     // Settings state
     current_theme: Theme,
     font_scale: f32,
+    // Customization
+    terminal_text_color: egui::Color32,
+    markdown_text_color: egui::Color32,
+    ssh_text_color: egui::Color32,
+    font_mode: FontMode,
+    custom_font_info: Option<String>,
     // Sidebar state
     sidebar_collapsed: bool,
 }
@@ -159,6 +173,11 @@ impl Default for GuiApp {
             ssh_manager: SshManager::load_or_default(),
             current_theme: Theme::Dark,
             font_scale: 1.0,
+            terminal_text_color: egui::Color32::from_rgb(220, 220, 220),
+            markdown_text_color: egui::Color32::from_rgb(220, 220, 220),
+            ssh_text_color: egui::Color32::from_rgb(200, 220, 255),
+            font_mode: FontMode::Default,
+            custom_font_info: None,
             sidebar_collapsed: false,
         }
     }
@@ -175,6 +194,29 @@ impl App for GuiApp {
         // Apply selected theme
         self.current_theme.apply(ctx);
         ctx.set_pixels_per_point(self.font_scale);
+
+        // Apply global font mode
+        match &self.font_mode {
+            FontMode::Default => {
+                // Reset to default fonts once per frame (cheap)
+                let defs = egui::FontDefinitions::default();
+                ctx.set_fonts(defs);
+            }
+            FontMode::MonospaceEverywhere => {
+                let mut defs = egui::FontDefinitions::default();
+                if let Some(mono) = defs.families.get(&egui::FontFamily::Monospace).cloned() {
+                    defs.families.insert(egui::FontFamily::Proportional, mono);
+                }
+                ctx.set_fonts(defs);
+            }
+            FontMode::Custom(_) => {
+                if let Some(info) = &self.custom_font_info {
+                    // Keep previously loaded custom font active; nothing to do here.
+                    // If user cleared custom font, font_mode will be changed back to Default.
+                    let _ = info; // silence warning
+                }
+            }
+        }
 
         egui::TopBottomPanel::top("top").show(ctx, |ui| {
             ui.horizontal_wrapped(|ui| {
@@ -268,7 +310,8 @@ impl App for GuiApp {
                             ui.separator();
                         }
                         if ui.button("➕ Neues Terminal").clicked() {
-                            if let Ok(term) = TerminalView::new() {
+                            if let Ok(mut term) = TerminalView::new() {
+                                term.text_color = self.terminal_text_color;
                                 self.terminals.push(TerminalTab {
                                     name: format!("Terminal {}", self.terminals.len() + 1),
                                     terminal: term,
@@ -289,6 +332,8 @@ impl App for GuiApp {
                     
                     // Active terminal
                     if let Some(tab) = self.terminals.get_mut(self.active_terminal_tab) {
+                        // Ensure terminal respects current color if changed elsewhere
+                        tab.terminal.text_color = self.terminal_text_color;
                         tab.terminal.ui(ui);
                     } else {
                         ui.colored_label(egui::Color32::RED, "Kein Terminal verfügbar.");
@@ -296,7 +341,11 @@ impl App for GuiApp {
                 }
                 1 => {
                     ui.heading("SSH Verbindungen");
+                    // Apply SSH text color only within this panel
+                    let old = ui.visuals_mut().override_text_color;
+                    ui.visuals_mut().override_text_color = Some(self.ssh_text_color);
                     self.ssh_manager.ui(ui);
+                    ui.visuals_mut().override_text_color = old;
                 }
                 2 => {
                     ui.heading("Markdown Editor");
@@ -334,7 +383,10 @@ impl App for GuiApp {
                     
                     // Active markdown editor
                     if let Some(tab) = self.markdown_editors.get_mut(self.active_markdown_tab) {
+                        let old = ui.visuals_mut().override_text_color;
+                        ui.visuals_mut().override_text_color = Some(self.markdown_text_color);
                         tab.editor.ui(ui);
+                        ui.visuals_mut().override_text_color = old;
                     }
                 }
                 3 => {
@@ -376,6 +428,82 @@ impl App for GuiApp {
                     ui.add_space(15.0);
                     ui.separator();
                     ui.add_space(10.0);
+
+                    // Per-view text colors
+                    ui.group(|ui| {
+                        ui.label(egui::RichText::new("Farben pro Bereich:").strong());
+                        ui.add_space(6.0);
+                        ui.horizontal(|ui| {
+                            ui.label("Terminal Textfarbe:");
+                            let mut c = self.terminal_text_color;
+                            if ui.color_edit_button_srgba(&mut c).changed() {
+                                self.terminal_text_color = c;
+                                // Apply to all terminal tabs
+                                for t in &mut self.terminals {
+                                    t.terminal.text_color = c;
+                                }
+                            }
+                        });
+                        ui.horizontal(|ui| {
+                            ui.label("Markdown Textfarbe:");
+                            ui.color_edit_button_srgba(&mut self.markdown_text_color);
+                        });
+                        ui.horizontal(|ui| {
+                            ui.label("SSH Textfarbe:");
+                            ui.color_edit_button_srgba(&mut self.ssh_text_color);
+                        });
+                    });
+
+                    ui.add_space(15.0);
+                    ui.separator();
+                    ui.add_space(10.0);
+
+                    // Global font selection
+                    ui.group(|ui| {
+                        ui.label(egui::RichText::new("Schriftart (global):").strong());
+                        ui.add_space(6.0);
+                        egui::ComboBox::from_id_source("font_mode")
+                            .selected_text(match self.font_mode { FontMode::Default => "Standard", FontMode::MonospaceEverywhere => "Monospace überall", FontMode::Custom(_) => "Benutzerdefiniert" })
+                            .show_ui(ui, |ui| {
+                                if ui.selectable_label(matches!(self.font_mode, FontMode::Default), "Standard").clicked() {
+                                    self.font_mode = FontMode::Default;
+                                    self.custom_font_info = None;
+                                }
+                                if ui.selectable_label(matches!(self.font_mode, FontMode::MonospaceEverywhere), "Monospace überall").clicked() {
+                                    self.font_mode = FontMode::MonospaceEverywhere;
+                                    self.custom_font_info = None;
+                                }
+                                if ui.selectable_label(matches!(self.font_mode, FontMode::Custom(_)), "Benutzerdefiniert").clicked() {
+                                    self.font_mode = FontMode::Custom(String::new());
+                                }
+                            });
+
+                        if matches!(self.font_mode, FontMode::Custom(_)) {
+                            ui.horizontal(|ui| {
+                                if ui.button("📁 Schrift laden (.ttf/.otf)").clicked() {
+                                    if let Some(path) = rfd::FileDialog::new().add_filter("Font", &["ttf", "otf"]).pick_file() {
+                                        if let Ok(bytes) = std::fs::read(&path) {
+                                            let mut defs = egui::FontDefinitions::default();
+                                            defs.font_data.insert("user".into(), egui::FontData::from_owned(bytes));
+                                            // Use custom font for both families by name
+                                            defs.families.insert(egui::FontFamily::Proportional, vec!["user".to_string()]);
+                                            defs.families.insert(egui::FontFamily::Monospace, vec!["user".to_string()]);
+                                            ui.ctx().set_fonts(defs);
+                                            self.custom_font_info = Some(path.display().to_string());
+                                            self.font_mode = FontMode::Custom("user".into());
+                                        }
+                                    }
+                                }
+                                if let Some(info) = &self.custom_font_info {
+                                    ui.label(format!("Aktiv: {}", info));
+                                    if ui.button("Zurücksetzen").clicked() {
+                                        self.custom_font_info = None;
+                                        self.font_mode = FontMode::Default;
+                                    }
+                                }
+                            });
+                        }
+                    });
                     
                     // Font scale
                     ui.horizontal(|ui| {
@@ -461,6 +589,8 @@ struct TerminalView {
     suggestions: Vec<String>,
     selected_suggestion: usize,
     show_suggestions: bool,
+    // Appearance
+    text_color: egui::Color32,
 }
 
 // Common shell commands for suggestions
@@ -547,6 +677,7 @@ impl TerminalView {
             suggestions: Vec::new(),
             selected_suggestion: 0,
             show_suggestions: false,
+            text_color: egui::Color32::from_rgb(220, 220, 220),
         })
     }
 
@@ -613,7 +744,7 @@ impl TerminalView {
             }
 
             // Render VT screen first (before input handling to ensure visibility)
-            let scroll_output = egui::ScrollArea::both()
+            let _scroll_output = egui::ScrollArea::both()
                 .auto_shrink([false, false])
                 .show(ui, |ui| {
                 let screen = self.parser.screen();
@@ -622,6 +753,7 @@ impl TerminalView {
                 
                 // Get cursor position from vt100
                 let (cursor_row, cursor_col) = screen.cursor_position();
+                let display_col: u16 = cursor_col.saturating_sub(1);
                 
                 if lines.is_empty() {
                     ui.colored_label(egui::Color32::from_rgb(150, 150, 150), "[Terminal bereit - tippe einen Befehl]");
@@ -637,28 +769,28 @@ impl TerminalView {
                             ui.horizontal(|ui| {
                                 let chars: Vec<char> = line.chars().collect();
                                 
-                                // Render characters before cursor in white
-                                if cursor_col > 0 {
-                                    let before: String = chars.iter().take(cursor_col as usize).collect();
-                                    ui.colored_label(egui::Color32::from_rgb(220, 220, 220), 
+                                // Render characters before cursor in chosen color
+                                if display_col > 0 {
+                                    let before: String = chars.iter().take(display_col as usize).collect();
+                                    ui.colored_label(self.text_color, 
                                         egui::RichText::new(&before).monospace());
                                 }
                                 
-                                // Render green cursor (no blinking)
-                                let cursor_char = chars.get(cursor_col as usize).unwrap_or(&' ');
+                                // Render green cursor (no blinking) at display_col
+                                let cursor_char = chars.get(display_col as usize).unwrap_or(&' ');
                                 ui.colored_label(egui::Color32::from_rgb(0, 255, 0), 
                                     format!("{}", if *cursor_char == ' ' { '█' } else { *cursor_char }));
                                 
-                                // Render characters after cursor in white
-                                if (cursor_col as usize) < chars.len() - 1 {
-                                    let after: String = chars.iter().skip(cursor_col as usize + 1).collect();
-                                    ui.colored_label(egui::Color32::from_rgb(220, 220, 220), 
+                                // Render characters after cursor in chosen color
+                                if (display_col as usize) < chars.len().saturating_sub(1) {
+                                    let after: String = chars.iter().skip(display_col as usize + 1).collect();
+                                    ui.colored_label(self.text_color, 
                                         egui::RichText::new(&after).monospace());
                                 }
                             });
                         } else {
-                            // Normal line without cursor - bright white text
-                            ui.colored_label(egui::Color32::from_rgb(220, 220, 220), 
+                            // Normal line without cursor - chosen text color
+                            ui.colored_label(self.text_color, 
                                 egui::RichText::new(*line).monospace());
                         }
                     }
