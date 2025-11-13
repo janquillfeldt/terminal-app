@@ -850,7 +850,8 @@ impl App for GuiApp {
                                     tab.terminal.cursor_color = self.cursor_color;
                                     tab.terminal.cursor_shape = self.cursor_shape;
                                     tab.terminal.cursor_blinking = self.cursor_blinking;
-                                    tab.terminal.ui(ui);
+                                    // Main terminal is considered active when split view is shown alongside
+                                    tab.terminal.ui_with_activity(ui, /*active*/ true);
                                 }
                             });
                             
@@ -873,7 +874,7 @@ impl App for GuiApp {
                                         term_tab.terminal.cursor_color = self.cursor_color;
                                         term_tab.terminal.cursor_shape = self.cursor_shape;
                                         term_tab.terminal.cursor_blinking = self.cursor_blinking;
-                                        term_tab.terminal.ui(ui);
+                                        term_tab.terminal.ui_with_activity(ui, /*active*/ is_active);
                                     }
                                 });
                                 if idx < panes_len - 1 {
@@ -889,7 +890,7 @@ impl App for GuiApp {
                             tab.terminal.cursor_color = self.cursor_color;
                             tab.terminal.cursor_shape = self.cursor_shape;
                             tab.terminal.cursor_blinking = self.cursor_blinking;
-                            tab.terminal.ui(ui);
+                            tab.terminal.ui_with_activity(ui, /*active*/ true);
                         } else {
                             ui.colored_label(egui::Color32::RED, "Kein Terminal verfügbar.");
                         }
@@ -1458,6 +1459,7 @@ struct TerminalView {
     cursor_blinking: bool,
     cursor_visible: bool, // for blink state
     last_blink_time: f64,
+    last_paint_time: f64,
 }
 
 // Common shell commands for suggestions
@@ -1550,6 +1552,7 @@ impl TerminalView {
             cursor_blinking: false,
             cursor_visible: true,
             last_blink_time: 0.0,
+            last_paint_time: 0.0,
         })
     }
 
@@ -1651,6 +1654,7 @@ impl TerminalView {
             cursor_blinking: false,
             cursor_visible: true,
             last_blink_time: 0.0,
+            last_paint_time: 0.0,
         })
     }
 
@@ -1689,7 +1693,7 @@ impl TerminalView {
         self.selected_suggestion = 0;
     }
 
-    fn ui(&mut self, ui: &mut egui::Ui) {
+    fn ui_with_activity(&mut self, ui: &mut egui::Ui, active: bool) {
         // Drain incoming bytes and update VT parser
         let mut processed_bytes = false;
         for chunk in self.rx.try_iter() { 
@@ -1698,7 +1702,7 @@ impl TerminalView {
         }
 
         // Handle cursor blinking
-        if self.cursor_blinking {
+        if self.cursor_blinking && active {
             let current_time = ui.input(|i| i.time);
             if current_time - self.last_blink_time > 0.5 {
                 self.cursor_visible = !self.cursor_visible;
@@ -1709,11 +1713,22 @@ impl TerminalView {
             self.cursor_visible = true;
         }
 
-        // Repaint policy: only repaint on new data or cursor blink to reduce CPU
+        // Repaint policy: only repaint on new data or cursor blink for active view.
+        // For inactive but visible terminals, cap to ~10 FPS when data is streaming.
+        let now = ui.input(|i| i.time);
         if processed_bytes {
-            ui.ctx().request_repaint();
-        } else if self.cursor_blinking {
-            ui.ctx().request_repaint_after(std::time::Duration::from_millis(500));
+            if active {
+                ui.ctx().request_repaint();
+            } else {
+                // Throttle: if last paint was <100ms ago, schedule next repaint after the remainder.
+                let dt = now - self.last_paint_time;
+                if dt >= 0.1 {
+                    ui.ctx().request_repaint();
+                } else {
+                    let wait = ((0.1 - dt).max(0.0) * 1000.0) as u64;
+                    ui.ctx().request_repaint_after(std::time::Duration::from_millis(wait));
+                }
+            }
         }
 
         // Create a visually distinct terminal frame
@@ -1941,7 +1956,11 @@ impl TerminalView {
             ui.colored_label(egui::Color32::GREEN, "⌨️ Terminal aktiv - Befehle werden direkt verarbeitet (Tab für Vorschläge)");
         }
         }); // Close frame
+        // Mark paint time for throttling
+        self.last_paint_time = ui.input(|i| i.time);
     }
+
+    // (intentionally no simple wrapper to avoid unused warnings)
 }
 
 // Map vt100 colors to egui::Color32

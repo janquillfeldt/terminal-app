@@ -99,7 +99,7 @@
 	- [x] Run-Length-Rendering je Zeile (weniger Allokationen/Append-Aufrufe)
 	- [x] Per-Frame Font-Rekonfiguration entfernt (nur bei Settings-Änderungen)
 - [ ] Virtuelle Scrolling für 10.000+ Zeilen
-- [ ] Frame-Rate bei inaktiven Tabs reduzieren
+- [x] Frame-Rate bei inaktiven Splits drosseln (≈10 FPS bei starkem Output)
 
 ### ✅ README - ERLEDIGT
 - [x] Buy Me a Coffee Link getestet (funktioniert mit HTML img tag)
