@@ -2,29 +2,32 @@
 
 ## 🔴 Priorität 1: Kritisch (Kern-Funktionalität)
 
-### ⚙️ Settings-Persistenz (30 Min)
-- [ ] `Settings`-Struct mit allen Einstellungen erstellen
-- [ ] Serde-Serialisierung implementieren (`~/.config/termix/settings.toml`)
-- [ ] Auto-Save bei Änderungen + Load beim Start
-- [ ] Fehlerbehandlung für kaputte Config-Dateien
+### ✅ Settings-Persistenz (30 Min) - ERLEDIGT
+- [x] `Settings`-Struct mit allen Einstellungen erstellen
+- [x] Serde-Serialisierung implementieren (`~/.config/termix/settings.toml`)
+- [x] Auto-Save bei Änderungen + Load beim Start
+- [x] Fehlerbehandlung für kaputte Config-Dateien
 
 **Warum:** Nutzer verlieren aktuell alle Einstellungen bei jedem Neustart
+**Status:** ✓ Implementiert - Alle GUI-Einstellungen werden automatisch gespeichert und beim Start geladen
 
-### 🎨 ANSI-Farben im Terminal (45 Min)
-- [ ] Von `contents()` zu `screen.cell(row, col)` API wechseln
-- [ ] Cell-Attribute auslesen (Farbe, Bold, Italic, etc.)
-- [ ] vt100-Farben zu egui::Color32 mappen
-- [ ] 256-Color und True-Color Support
+### ✅ ANSI-Farben im Terminal (45 Min) - ERLEDIGT
+- [x] Von `contents()` zu `screen.cell(row, col)` API wechseln
+- [x] Cell-Attribute auslesen (Farbe, Bold, Italic, etc.)
+- [x] vt100-Farben zu egui::Color32 mappen
+- [x] 256-Color und True-Color Support
 
 **Warum:** Terminal zeigt aktuell alles weiß, keine `ls --color` oder Syntax-Highlighting
+**Status:** ✓ Implementiert - Zellenbasiertes Rendering mit voller Farbunterstützung (16/256/Truecolor)
 
-### 🔌 SSH-Verbindungen implementieren (2 Std)
-- [ ] ssh2-Crate mit TerminalView verbinden
-- [ ] Session-Management (connect, disconnect, reconnect)
-- [ ] Passwort-Dialog + optional Key-basierte Auth
-- [ ] Fehlerbehandlung (Timeout, falsche Credentials, etc.)
+### ✅ SSH-Verbindungen implementieren (2 Std) - ERLEDIGT
+- [x] ssh2-Crate mit TerminalView verbinden
+- [x] Session-Management (connect, disconnect, reconnect)
+- [x] Passwort-Dialog + optional Key-basierte Auth
+- [x] Fehlerbehandlung (Timeout, falsche Credentials, etc.)
 
 **Warum:** SSH-Manager ist aktuell nur UI-Placeholder ohne Funktion
+**Status:** ✓ Implementiert - Vollständige SSH-Integration mit Passwort-Dialog und detailliertem Error-Handling
 
 ---
 

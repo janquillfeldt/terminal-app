@@ -236,6 +236,10 @@ pub struct GuiApp {
     // Rename dialogs
     terminal_rename_dialog: Option<(usize, String)>, // (tab_index, new_name)
     markdown_rename_dialog: Option<(usize, String)>, // (tab_index, new_name)
+    // SSH connection request (from SshManager UI)
+    pending_ssh_connection: Option<SshConnection>,
+    // SSH password prompt
+    ssh_password_prompt: Option<(SshConnection, String)>, // (connection, password_input)
 }
 
 #[cfg(feature = "gui")]
@@ -287,6 +291,8 @@ impl Default for GuiApp {
             sidebar_collapsed: false,
             terminal_rename_dialog: None,
             markdown_rename_dialog: None,
+            pending_ssh_connection: None,
+            ssh_password_prompt: None,
         }
     }
 }
@@ -613,7 +619,7 @@ impl App for GuiApp {
                     // Apply SSH text color only within this panel
                     let old = ui.visuals_mut().override_text_color;
                     ui.visuals_mut().override_text_color = Some(self.ssh_text_color);
-                    self.ssh_manager.ui(ui);
+                    self.ssh_manager.ui(ui, &mut self.pending_ssh_connection);
                     ui.visuals_mut().override_text_color = old;
                 }
                 2 => {
@@ -980,6 +986,88 @@ impl App for GuiApp {
         if close_markdown_rename_dialog {
             self.markdown_rename_dialog = None;
         }
+
+        // Handle pending SSH connection request
+        if let Some(ssh_conn) = self.pending_ssh_connection.take() {
+            // If no password stored, show prompt dialog
+            if ssh_conn.password.is_empty() {
+                self.ssh_password_prompt = Some((ssh_conn, String::new()));
+            } else {
+                // Try to create SSH terminal
+                match TerminalView::new_ssh(&ssh_conn) {
+                    Ok(mut term) => {
+                        term.text_color = self.terminal_text_color;
+                        term.cursor_color = self.cursor_color;
+                        term.cursor_shape = self.cursor_shape;
+                        term.cursor_blinking = self.cursor_blinking;
+                        self.terminals.push(TerminalTab {
+                            name: format!("SSH: {}", ssh_conn.name),
+                            terminal: term,
+                        });
+                        self.active_terminal_tab = self.terminals.len() - 1;
+                        self.selected = 0; // Switch to Terminal view
+                        self.ssh_manager.status_message = format!("✓ Verbunden mit {}", ssh_conn.name);
+                    }
+                    Err(e) => {
+                        // Show error in SSH manager status
+                        self.ssh_manager.status_message = format!("❌ Fehler: {}", e);
+                    }
+                }
+            }
+        }
+
+        // SSH password prompt dialog
+        let mut close_password_prompt = false;
+        let mut attempt_connection = None;
+        if let Some((ref conn, ref mut password)) = self.ssh_password_prompt {
+            egui::Window::new("SSH Passwort erforderlich")
+                .collapsible(false)
+                .resizable(false)
+                .show(ctx, |ui| {
+                    ui.label(format!("Verbindung zu: {}@{}:{}", conn.username, conn.host, conn.port));
+                    ui.separator();
+                    ui.horizontal(|ui| {
+                        ui.label("Passwort:");
+                        ui.add(egui::TextEdit::singleline(password).password(true));
+                    });
+                    ui.separator();
+                    ui.horizontal(|ui| {
+                        if ui.button("✓ Verbinden").clicked() {
+                            let mut conn_with_pwd = conn.clone();
+                            conn_with_pwd.password = password.clone();
+                            attempt_connection = Some(conn_with_pwd);
+                            close_password_prompt = true;
+                        }
+                        if ui.button("✗ Abbrechen").clicked() {
+                            close_password_prompt = true;
+                        }
+                    });
+                });
+        }
+        if close_password_prompt {
+            self.ssh_password_prompt = None;
+        }
+        if let Some(conn) = attempt_connection {
+            // Try SSH connection with provided password
+            match TerminalView::new_ssh(&conn) {
+                Ok(mut term) => {
+                    term.text_color = self.terminal_text_color;
+                    term.cursor_color = self.cursor_color;
+                    term.cursor_shape = self.cursor_shape;
+                    term.cursor_blinking = self.cursor_blinking;
+                    self.terminals.push(TerminalTab {
+                        name: format!("SSH: {}", conn.name),
+                        terminal: term,
+                    });
+                    self.active_terminal_tab = self.terminals.len() - 1;
+                    self.selected = 0;
+                    self.ssh_manager.status_message = format!("✓ Verbunden mit {}", conn.name);
+                }
+                Err(e) => {
+                    self.ssh_manager.status_message = format!("❌ Fehler: {}", e);
+                }
+            }
+        }
     }
 }
 
@@ -1102,6 +1190,107 @@ impl TerminalView {
             cols: initial_cols,
             rows: initial_rows,
             master,
+            input_buffer: String::new(),
+            suggestions: Vec::new(),
+            selected_suggestion: 0,
+            show_suggestions: false,
+            text_color: egui::Color32::from_rgb(220, 220, 220),
+            cursor_color: egui::Color32::from_rgb(0, 255, 0),
+            cursor_shape: CursorShape::Block,
+            cursor_blinking: false,
+            cursor_visible: true,
+            last_blink_time: 0.0,
+        })
+    }
+
+    fn new_ssh(conn: &SshConnection) -> anyhow::Result<Self> {
+        use ssh2::Session;
+        use std::net::TcpStream;
+
+        let (to_writer_tx, to_writer_rx) = mpsc::channel::<Vec<u8>>();
+        let (from_reader_tx, from_reader_rx) = mpsc::channel::<Vec<u8>>();
+
+        // Connect to SSH server
+        let tcp = TcpStream::connect(format!("{}:{}", conn.host, conn.port))
+            .map_err(|e| anyhow::anyhow!("Verbindung zu {}:{} fehlgeschlagen: {}", conn.host, conn.port, e))?;
+        
+        let mut sess = Session::new()?;
+        sess.set_tcp_stream(tcp);
+        sess.handshake()
+            .map_err(|e| anyhow::anyhow!("SSH-Handshake fehlgeschlagen: {}", e))?;
+
+        // Authenticate
+        if conn.password.is_empty() {
+            anyhow::bail!("Kein Passwort angegeben. Bitte Passwort in den Verbindungseinstellungen speichern.");
+        }
+        
+        sess.userauth_password(&conn.username, &conn.password)
+            .map_err(|e| anyhow::anyhow!("Authentifizierung fehlgeschlagen: {}", e))?;
+        
+        if !sess.authenticated() {
+            anyhow::bail!("Authentifizierung fehlgeschlagen: Falsches Passwort oder Benutzer nicht berechtigt");
+        }
+
+        // Open channel and request PTY
+        let mut channel = sess.channel_session()
+            .map_err(|e| anyhow::anyhow!("Kanal-Erstellung fehlgeschlagen: {}", e))?;
+        channel.request_pty("xterm", None, Some((80, 24, 0, 0)))
+            .map_err(|e| anyhow::anyhow!("PTY-Anfrage fehlgeschlagen: {}", e))?;
+        channel.shell()
+            .map_err(|e| anyhow::anyhow!("Shell-Start fehlgeschlagen: {}", e))?;
+
+        let initial_cols = 80u16;
+        let initial_rows = 24u16;
+
+        // Split channel for read/write
+        let read_channel = channel.stream(0);
+        let mut write_channel = channel.stream(0);
+
+        // Writer thread
+        thread::spawn(move || {
+            while let Ok(buf) = to_writer_rx.recv() {
+                let _ = write_channel.write_all(&buf);
+                let _ = write_channel.flush();
+            }
+        });
+
+        // Reader thread
+        thread::spawn(move || {
+            let mut buf = [0u8; 4096];
+            let mut read_stream = read_channel;
+            loop {
+                match read_stream.read(&mut buf) {
+                    Ok(0) => {
+                        let _ = from_reader_tx.send(b"\n[SSH connection closed]\n".to_vec());
+                        break;
+                    }
+                    Ok(n) => {
+                        let _ = from_reader_tx.send(buf[..n].to_vec());
+                    }
+                    Err(_) => {
+                        thread::sleep(Duration::from_millis(10));
+                    }
+                }
+            }
+        });
+
+        // Create a dummy PTY master that does nothing (SSH channel handles I/O via threads)
+        let pty_system = NativePtySystem::default();
+        let pair = pty_system.openpty(PtySize {
+            rows: initial_rows,
+            cols: initial_cols,
+            pixel_width: 0,
+            pixel_height: 0,
+        })?;
+        let master: Box<dyn MasterPty + Send> = pair.master;
+
+        Ok(Self {
+            rx: from_reader_rx,
+            writer: to_writer_tx,
+            parser: VtParser::new(initial_rows, initial_cols, 2000),
+            cols: initial_cols,
+            rows: initial_rows,
+            master, // Dummy; resize will be ignored for SSH
             input_buffer: String::new(),
             suggestions: Vec::new(),
             selected_suggestion: 0,
@@ -1579,7 +1768,7 @@ impl SshManager {
         }
     }
 
-    fn ui(&mut self, ui: &mut egui::Ui) {
+    fn ui(&mut self, ui: &mut egui::Ui, pending_connection: &mut Option<SshConnection>) {
         // Add connection button
         ui.horizontal(|ui| {
             if ui.button("➕ Neue SSH Verbindung").clicked() {
@@ -1680,11 +1869,9 @@ impl SshManager {
         }
 
         if let Some(idx) = to_connect {
-            let conn = &self.connections[idx];
+            let conn = self.connections[idx].clone();
             self.status_message = format!("Verbinde zu {}@{}:{}...", conn.username, conn.host, conn.port);
-            // TODO: Implement actual SSH connection using ssh2 crate
-            // For now, just show a message
-            self.status_message += " (SSH Implementierung folgt)";
+            *pending_connection = Some(conn);
         }
 
         if self.connections.is_empty() {
