@@ -240,6 +240,8 @@ pub struct GuiApp {
     pending_ssh_connection: Option<SshConnection>,
     // SSH password prompt
     ssh_password_prompt: Option<(SshConnection, String)>, // (connection, password_input)
+    // Terminal settings
+    scrollback_lines: usize,
 }
 
 #[cfg(feature = "gui")]
@@ -258,7 +260,7 @@ struct MarkdownTab {
 impl Default for GuiApp {
     fn default() -> Self {
         let mut terminals = Vec::new();
-        if let Ok(term) = TerminalView::new() {
+        if let Ok(term) = TerminalView::new(2000) {
             terminals.push(TerminalTab {
                 name: "Terminal 1".to_string(),
                 terminal: term,
@@ -293,6 +295,7 @@ impl Default for GuiApp {
             markdown_rename_dialog: None,
             pending_ssh_connection: None,
             ssh_password_prompt: None,
+            scrollback_lines: 2000,
         }
     }
 }
@@ -368,6 +371,9 @@ impl GuiApp {
         // Sidebar state
         self.sidebar_collapsed = settings.sidebar_collapsed;
 
+        // Terminal settings
+        self.scrollback_lines = settings.scrollback_lines.max(100).min(100000);
+
         // Propagate to existing terminals
         for t in &mut self.terminals {
             t.terminal.text_color = self.terminal_text_color;
@@ -390,6 +396,7 @@ impl GuiApp {
             font_mode: self.font_mode.id().into(),
             custom_font_path: self.custom_font_info.clone(),
             sidebar_collapsed: self.sidebar_collapsed,
+            scrollback_lines: self.scrollback_lines,
         }
     }
 
@@ -403,11 +410,118 @@ impl GuiApp {
         app.apply_settings(&settings, &cc.egui_ctx);
         app
     }
+
+    fn handle_keyboard_shortcuts(&mut self, ctx: &egui::Context) {
+        ctx.input(|i| {
+            // Ctrl+T: New Terminal Tab
+            if i.modifiers.ctrl && i.key_pressed(egui::Key::T) {
+                if self.selected == 0 { // Only in Terminal view
+                    if let Ok(mut term) = TerminalView::new(self.scrollback_lines) {
+                        term.text_color = self.terminal_text_color;
+                        term.cursor_color = self.cursor_color;
+                        term.cursor_shape = self.cursor_shape;
+                        term.cursor_blinking = self.cursor_blinking;
+                        self.terminals.push(TerminalTab {
+                            name: format!("Terminal {}", self.terminals.len() + 1),
+                            terminal: term,
+                        });
+                        self.active_terminal_tab = self.terminals.len() - 1;
+                    }
+                }
+            }
+
+            // Ctrl+W: Close active tab
+            if i.modifiers.ctrl && i.key_pressed(egui::Key::W) {
+                match self.selected {
+                    0 => { // Terminal
+                        if self.terminals.len() > 1 {
+                            self.terminals.remove(self.active_terminal_tab);
+                            if self.active_terminal_tab >= self.terminals.len() {
+                                self.active_terminal_tab = self.terminals.len().saturating_sub(1);
+                            }
+                        }
+                    }
+                    2 => { // Markdown
+                        if self.markdown_editors.len() > 1 {
+                            self.markdown_editors.remove(self.active_markdown_tab);
+                            if self.active_markdown_tab >= self.markdown_editors.len() {
+                                self.active_markdown_tab = self.markdown_editors.len().saturating_sub(1);
+                            }
+                        }
+                    }
+                    _ => {}
+                }
+            }
+
+            // Ctrl+Tab: Next tab
+            if i.modifiers.ctrl && i.key_pressed(egui::Key::Tab) && !i.modifiers.shift {
+                match self.selected {
+                    0 => {
+                        if !self.terminals.is_empty() {
+                            self.active_terminal_tab = (self.active_terminal_tab + 1) % self.terminals.len();
+                        }
+                    }
+                    2 => {
+                        if !self.markdown_editors.is_empty() {
+                            self.active_markdown_tab = (self.active_markdown_tab + 1) % self.markdown_editors.len();
+                        }
+                    }
+                    _ => {}
+                }
+            }
+
+            // Ctrl+Shift+Tab: Previous tab
+            if i.modifiers.ctrl && i.modifiers.shift && i.key_pressed(egui::Key::Tab) {
+                match self.selected {
+                    0 => {
+                        if !self.terminals.is_empty() {
+                            self.active_terminal_tab = if self.active_terminal_tab == 0 {
+                                self.terminals.len() - 1
+                            } else {
+                                self.active_terminal_tab - 1
+                            };
+                        }
+                    }
+                    2 => {
+                        if !self.markdown_editors.is_empty() {
+                            self.active_markdown_tab = if self.active_markdown_tab == 0 {
+                                self.markdown_editors.len() - 1
+                            } else {
+                                self.active_markdown_tab - 1
+                            };
+                        }
+                    }
+                    _ => {}
+                }
+            }
+
+            // Ctrl+Plus/Equals: Increase font size
+            if i.modifiers.ctrl && i.key_pressed(egui::Key::Plus) {
+                self.font_scale = (self.font_scale + 0.1).min(3.0);
+                self.save_settings();
+            }
+
+            // Ctrl+Minus: Decrease font size
+            if i.modifiers.ctrl && i.key_pressed(egui::Key::Minus) {
+                self.font_scale = (self.font_scale - 0.1).max(0.5);
+                self.save_settings();
+            }
+
+            // Ctrl+0: Reset font size
+            if i.modifiers.ctrl && i.key_pressed(egui::Key::Num0) {
+                self.font_scale = 1.0;
+                self.save_settings();
+            }
+        });
+    }
 }
 
 #[cfg(feature = "gui")]
 impl App for GuiApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut Frame) {
+        // Handle global keyboard shortcuts
+        self.handle_keyboard_shortcuts(ctx);
+
         // Apply selected theme
         self.current_theme.apply(ctx);
         ctx.set_pixels_per_point(self.font_scale);
@@ -563,19 +677,24 @@ impl App for GuiApp {
                         let mut to_rename = None;
                         for (idx, tab) in self.terminals.iter().enumerate() {
                             let selected = idx == self.active_terminal_tab;
-                            if ui.selectable_label(selected, &tab.name).clicked() {
-                                self.active_terminal_tab = idx;
-                            }
-                            if ui.small_button("✏").on_hover_text("Umbenennen").clicked() {
-                                to_rename = Some(idx);
-                            }
-                            if ui.small_button("✕").clicked() && self.terminals.len() > 1 {
-                                to_close = Some(idx);
-                            }
-                            ui.separator();
+                            ui.group(|ui| {
+                                if ui.selectable_label(selected, &tab.name).clicked() {
+                                    self.active_terminal_tab = idx;
+                                }
+                                ui.horizontal(|ui| {
+                                    if ui.small_button("✏").on_hover_text("Umbenennen").clicked() {
+                                        to_rename = Some(idx);
+                                    }
+                                    if self.terminals.len() > 1 {
+                                        if ui.small_button("×").on_hover_text("Schließen (Strg+W)").clicked() {
+                                            to_close = Some(idx);
+                                        }
+                                    }
+                                });
+                            });
                         }
-                        if ui.button("➕ Neues Terminal").clicked() {
-                            if let Ok(mut term) = TerminalView::new() {
+                        if ui.button("➕ Neues Terminal").on_hover_text("Strg+T").clicked() {
+                            if let Ok(mut term) = TerminalView::new(self.scrollback_lines) {
                                 term.text_color = self.terminal_text_color;
                                 term.cursor_color = self.cursor_color;
                                 term.cursor_shape = self.cursor_shape;
@@ -587,6 +706,7 @@ impl App for GuiApp {
                                 self.active_terminal_tab = self.terminals.len() - 1;
                             }
                         }
+                        ui.label(egui::RichText::new("Strg+W: Schließen | Strg+Tab: Wechseln").small().color(egui::Color32::GRAY));
                         
                         if let Some(idx) = to_rename {
                             self.terminal_rename_dialog = Some((idx, self.terminals[idx].name.clone()));
@@ -631,16 +751,21 @@ impl App for GuiApp {
                         let mut to_rename = None;
                         for (idx, tab) in self.markdown_editors.iter().enumerate() {
                             let selected = idx == self.active_markdown_tab;
-                            if ui.selectable_label(selected, &tab.name).clicked() {
-                                self.active_markdown_tab = idx;
-                            }
-                            if ui.small_button("✏").on_hover_text("Umbenennen").clicked() {
-                                to_rename = Some(idx);
-                            }
-                            if ui.small_button("✕").clicked() && self.markdown_editors.len() > 1 {
-                                to_close = Some(idx);
-                            }
-                            ui.separator();
+                            ui.group(|ui| {
+                                if ui.selectable_label(selected, &tab.name).clicked() {
+                                    self.active_markdown_tab = idx;
+                                }
+                                ui.horizontal(|ui| {
+                                    if ui.small_button("✏").on_hover_text("Umbenennen").clicked() {
+                                        to_rename = Some(idx);
+                                    }
+                                    if self.markdown_editors.len() > 1 {
+                                        if ui.small_button("×").on_hover_text("Schließen (Strg+W)").clicked() {
+                                            to_close = Some(idx);
+                                        }
+                                    }
+                                });
+                            });
                         }
                         if ui.button("➕ Neues Dokument").clicked() {
                             self.markdown_editors.push(MarkdownTab {
@@ -649,6 +774,7 @@ impl App for GuiApp {
                             });
                             self.active_markdown_tab = self.markdown_editors.len() - 1;
                         }
+                        ui.label(egui::RichText::new("Strg+W: Schließen | Strg+Tab: Wechseln").small().color(egui::Color32::GRAY));
                         
                         if let Some(idx) = to_rename {
                             self.markdown_rename_dialog = Some((idx, self.markdown_editors[idx].name.clone()));
@@ -863,6 +989,26 @@ impl App for GuiApp {
                             self.save_settings();
                         }
                     });
+                    ui.label(egui::RichText::new("Strg+Plus/Minus: Zoom | Strg+0: Reset").small().color(egui::Color32::GRAY));
+                    
+                    ui.add_space(15.0);
+                    ui.separator();
+                    ui.add_space(10.0);
+
+                    // Terminal settings
+                    ui.group(|ui| {
+                        ui.label(egui::RichText::new("Terminal Einstellungen:").strong());
+                        ui.add_space(6.0);
+                        ui.horizontal(|ui| {
+                            ui.label("Scrollback-Zeilen:");
+                            let mut tmp = self.scrollback_lines as i32;
+                            if ui.add(egui::Slider::new(&mut tmp, 100..=10000).text("Zeilen")).changed() {
+                                self.scrollback_lines = tmp as usize;
+                                self.save_settings();
+                            }
+                        });
+                        ui.label(egui::RichText::new("Anzahl der Zeilen, die im Terminal gespeichert werden").small().color(egui::Color32::GRAY));
+                    });
                     
                     ui.add_space(15.0);
                     ui.separator();
@@ -994,7 +1140,7 @@ impl App for GuiApp {
                 self.ssh_password_prompt = Some((ssh_conn, String::new()));
             } else {
                 // Try to create SSH terminal
-                match TerminalView::new_ssh(&ssh_conn) {
+                match TerminalView::new_ssh(&ssh_conn, self.scrollback_lines) {
                     Ok(mut term) => {
                         term.text_color = self.terminal_text_color;
                         term.cursor_color = self.cursor_color;
@@ -1049,7 +1195,7 @@ impl App for GuiApp {
         }
         if let Some(conn) = attempt_connection {
             // Try SSH connection with provided password
-            match TerminalView::new_ssh(&conn) {
+            match TerminalView::new_ssh(&conn, self.scrollback_lines) {
                 Ok(mut term) => {
                     term.text_color = self.terminal_text_color;
                     term.cursor_color = self.cursor_color;
@@ -1126,7 +1272,7 @@ const COMMON_COMMANDS: &[&str] = &[
 
 #[cfg(feature = "gui")]
 impl TerminalView {
-    fn new() -> anyhow::Result<Self> {
+    fn new(scrollback: usize) -> anyhow::Result<Self> {
         let (to_writer_tx, to_writer_rx) = mpsc::channel::<Vec<u8>>();
         let (from_reader_tx, from_reader_rx) = mpsc::channel::<Vec<u8>>();
 
@@ -1186,7 +1332,7 @@ impl TerminalView {
         Ok(Self {
             rx: from_reader_rx,
             writer: to_writer_tx,
-            parser: VtParser::new(initial_rows, initial_cols, 2000),
+            parser: VtParser::new(initial_rows, initial_cols, scrollback),
             cols: initial_cols,
             rows: initial_rows,
             master,
@@ -1203,7 +1349,7 @@ impl TerminalView {
         })
     }
 
-    fn new_ssh(conn: &SshConnection) -> anyhow::Result<Self> {
+    fn new_ssh(conn: &SshConnection, scrollback: usize) -> anyhow::Result<Self> {
         use ssh2::Session;
         use std::net::TcpStream;
 
@@ -1287,7 +1433,7 @@ impl TerminalView {
         Ok(Self {
             rx: from_reader_rx,
             writer: to_writer_tx,
-            parser: VtParser::new(initial_rows, initial_cols, 2000),
+            parser: VtParser::new(initial_rows, initial_cols, scrollback),
             cols: initial_cols,
             rows: initial_rows,
             master, // Dummy; resize will be ignored for SSH

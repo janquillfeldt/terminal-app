@@ -32,6 +32,9 @@ pub struct AppSettings {
 
     // UI state
     pub sidebar_collapsed: bool,
+
+    // Terminal settings
+    pub scrollback_lines: usize,  // Default: 2000
 }
 
 impl Default for AppSettings {
@@ -48,6 +51,7 @@ impl Default for AppSettings {
             font_mode: "Default".into(),
             custom_font_path: None,
             sidebar_collapsed: false,
+            scrollback_lines: 2000,
         }
     }
 }

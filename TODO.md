@@ -34,22 +34,22 @@
 ## 🟡 Priorität 2: UX-Verbesserungen
 
 ### ⌨️ Keyboard-Shortcuts (1 Std)
-- [ ] Ctrl+T: Neuer Terminal-Tab
-- [ ] Ctrl+W: Tab schließen
-- [ ] Ctrl+Tab / Ctrl+Shift+Tab: Tab-Navigation
-- [ ] Ctrl+C / Ctrl+V: Copy/Paste im Terminal
-- [ ] Ctrl+Plus/Minus: Schriftgröße
-- [ ] Shortcuts in Tooltips anzeigen
+- [x] Ctrl+T: Neuer Terminal-Tab
+- [x] Ctrl+W: Tab schließen
+- [x] Ctrl+Tab / Ctrl+Shift+Tab: Tab-Navigation
+- [x] Ctrl+C / Ctrl+V: Copy/Paste im Terminal (bereits durch egui behandelt)
+- [x] Ctrl+Plus/Minus: Schriftgröße
+- [x] Shortcuts in Tooltips anzeigen
 
 ### 📜 Terminal-Scrollback verbessern
 - [ ] PageUp/PageDown Support
 - [ ] Mousewheel-Scrolling optimieren
 - [ ] Jump-to-Top / Jump-to-Bottom Buttons
-- [ ] Scrollback-Limit konfigurierbar (aktuell fix 2000 Zeilen)
+- [x] Scrollback-Limit konfigurierbar (100-10000 Zeilen)
 
 ### 🔄 Tab-Management
 - [ ] Drag & Drop zum Umordnen
-- [ ] Tab-Close-Buttons (× neben Namen)
+- [x] Tab-Close-Buttons (× neben Namen)
 - [ ] Ctrl+Click für schnelles Schließen
 - [ ] Tab-Übersicht bei vielen offenen Tabs (Dropdown)
 
