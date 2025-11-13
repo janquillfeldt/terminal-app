@@ -1758,95 +1758,96 @@ impl TerminalView {
                 self.resize(cols, rows);
             }
 
-            // Render VT screen with ANSI colors using cell-based iteration
-            let _scroll_output = egui::ScrollArea::both()
+            // Render VT screen with ANSI colors using vertically virtualized rows
+            use egui::text::LayoutJob;
+            let screen = self.parser.screen();
+            // Cursor position from vt100 (1-based columns -> we use saturating_sub(1))
+            let (cursor_row, cursor_col) = screen.cursor_position();
+            let display_col: u16 = cursor_col.saturating_sub(1);
+
+            let rows = self.rows as usize;
+            let cols = self.cols as usize;
+            let font_id = egui::TextStyle::Monospace.resolve(ui.style());
+            let row_height = char_h.max(1.0);
+
+            egui::ScrollArea::vertical()
                 .auto_shrink([false, false])
-                .show(ui, |ui| {
-                use egui::text::LayoutJob;
-                let screen = self.parser.screen();
-                // Cursor position from vt100 (1-based columns -> we use saturating_sub(1))
-                let (cursor_row, cursor_col) = screen.cursor_position();
-                let display_col: u16 = cursor_col.saturating_sub(1);
+                .show_rows(ui, row_height, rows, |ui, row_range| {
+                    for row in row_range {
+                        let mut job = LayoutJob::default();
+                        // Run-length encode same styled cells to reduce allocations
+                        let mut run_text = String::with_capacity(cols);
+                        let mut run_fg: egui::Color32 = self.text_color;
+                        let mut run_bg: Option<egui::Color32> = None;
+                        let mut run_active = false;
 
-                let rows = self.rows as usize;
-                let cols = self.cols as usize;
-                let font_id = egui::TextStyle::Monospace.resolve(ui.style());
+                        let flush_run = |job: &mut LayoutJob,
+                                             font_id: &egui::FontId,
+                                             text: &mut String,
+                                             fg: egui::Color32,
+                                             bg: Option<egui::Color32>,
+                                             active: &mut bool| {
+                            if !text.is_empty() {
+                                let mut format = egui::TextFormat { font_id: font_id.clone(), color: fg, ..Default::default() };
+                                #[allow(deprecated)]
+                                if let Some(bgc) = bg { format.background = bgc; }
+                                job.append(text, 0.0, format);
+                                text.clear();
+                                *active = false;
+                            }
+                        };
 
-                for row in 0..rows {
-                    let mut job = LayoutJob::default();
-                    // Run-length encode same styled cells to reduce allocations
-                    let mut run_text = String::with_capacity(cols);
-                    let mut run_fg: egui::Color32 = self.text_color;
-                    let mut run_bg: Option<egui::Color32> = None;
-                    let mut run_active = false;
+                        for col in 0..cols {
+                            // Fetch cell; fallback to space if out of bounds/missing
+                            let mut ch: char = ' ';
+                            let mut fg = self.text_color;
+                            let mut bg: Option<egui::Color32> = None;
+                            let mut inverse = false;
+                            if let Some(cell) = screen.cell(row as u16, col as u16) {
+                                let s = cell.contents();
+                                ch = s.chars().next().unwrap_or(' ');
+                                fg = vt_color_to_egui(cell.fgcolor(), self.text_color);
+                                let bg_c = vt_color_to_egui(cell.bgcolor(), egui::Color32::TRANSPARENT);
+                                if bg_c != egui::Color32::TRANSPARENT { bg = Some(bg_c); }
+                                if cell.inverse() { inverse = true; }
+                            }
 
-                    let flush_run = |job: &mut LayoutJob,
-                                         font_id: &egui::FontId,
-                                         text: &mut String,
-                                         fg: egui::Color32,
-                                         bg: Option<egui::Color32>,
-                                         active: &mut bool| {
-                        if !text.is_empty() {
-                            let mut format = egui::TextFormat { font_id: font_id.clone(), color: fg, ..Default::default() };
-                            #[allow(deprecated)]
-                            if let Some(bgc) = bg { format.background = bgc; }
-                            job.append(text, 0.0, format);
-                            text.clear();
-                            *active = false;
+                            // Cursor rendering
+                            let is_cursor_cell = self.cursor_visible && (row as u16 == cursor_row) && (col as u16 == display_col);
+                            if is_cursor_cell {
+                                // Flush any pending run before drawing cursor glyph
+                                flush_run(&mut job, &font_id, &mut run_text, run_fg, run_bg, &mut run_active);
+                                let rendered = self.cursor_shape.render(ch);
+                                let format = egui::TextFormat { font_id: font_id.clone(), color: self.cursor_color, ..Default::default() };
+                                job.append(&rendered, 0.0, format);
+                                continue;
+                            }
+
+                            // Effective colors with inverse
+                            let mut eff_fg = fg;
+                            let mut eff_bg = bg;
+                            if inverse {
+                                std::mem::swap(&mut eff_fg, eff_bg.get_or_insert(self.text_color));
+                            }
+
+                            // Extend current run or flush and start new
+                            if run_active && eff_fg == run_fg && eff_bg == run_bg {
+                                run_text.push(ch);
+                            } else {
+                                // flush previous
+                                flush_run(&mut job, &font_id, &mut run_text, run_fg, run_bg, &mut run_active);
+                                // start new run
+                                run_fg = eff_fg;
+                                run_bg = eff_bg;
+                                run_text.push(ch);
+                                run_active = true;
+                            }
                         }
-                    };
-
-                    for col in 0..cols {
-                        // Fetch cell; fallback to space if out of bounds/missing
-                        let mut ch: char = ' ';
-                        let mut fg = self.text_color;
-                        let mut bg: Option<egui::Color32> = None;
-                        let mut inverse = false;
-                        if let Some(cell) = screen.cell(row as u16, col as u16) {
-                            let s = cell.contents();
-                            ch = s.chars().next().unwrap_or(' ');
-                            fg = vt_color_to_egui(cell.fgcolor(), self.text_color);
-                            let bg_c = vt_color_to_egui(cell.bgcolor(), egui::Color32::TRANSPARENT);
-                            if bg_c != egui::Color32::TRANSPARENT { bg = Some(bg_c); }
-                            if cell.inverse() { inverse = true; }
-                        }
-
-                        // Cursor rendering
-                        let is_cursor_cell = self.cursor_visible && (row as u16 == cursor_row) && (col as u16 == display_col);
-                        if is_cursor_cell {
-                            // Flush any pending run before drawing cursor glyph
-                            flush_run(&mut job, &font_id, &mut run_text, run_fg, run_bg, &mut run_active);
-                            let rendered = self.cursor_shape.render(ch);
-                            let format = egui::TextFormat { font_id: font_id.clone(), color: self.cursor_color, ..Default::default() };
-                            job.append(&rendered, 0.0, format);
-                            continue;
-                        }
-
-                        // Effective colors with inverse
-                        let mut eff_fg = fg;
-                        let mut eff_bg = bg;
-                        if inverse {
-                            std::mem::swap(&mut eff_fg, eff_bg.get_or_insert(self.text_color));
-                        }
-
-                        // Extend current run or flush and start new
-                        if run_active && eff_fg == run_fg && eff_bg == run_bg {
-                            run_text.push(ch);
-                        } else {
-                            // flush previous
-                            flush_run(&mut job, &font_id, &mut run_text, run_fg, run_bg, &mut run_active);
-                            // start new run
-                            run_fg = eff_fg;
-                            run_bg = eff_bg;
-                            run_text.push(ch);
-                            run_active = true;
-                        }
+                        // flush last run for the row
+                        flush_run(&mut job, &font_id, &mut run_text, run_fg, run_bg, &mut run_active);
+                        ui.label(job);
                     }
-                    // flush last run for the row
-                    flush_run(&mut job, &font_id, &mut run_text, run_fg, run_bg, &mut run_active);
-                    ui.label(job);
-                }
-            });
+                });
 
         // Always handle keyboard input when Terminal is the active panel
         ui.input(|i| {
