@@ -250,9 +250,12 @@ pub struct GuiApp {
     active_pane: usize,
 }
 #[cfg(feature = "gui")]
+#[allow(private_interfaces)]
 pub struct SplitPane {
+    #[allow(dead_code)]
     pub orientation: SplitOrientation,
-    pub terminals: Vec<TerminalTab>,
+    pub(crate) terminals: Vec<TerminalTab>,
+    #[allow(dead_code)]
     pub size: f32, // relative size (0.0..1.0)
 }
 
@@ -286,11 +289,10 @@ impl Default for GuiApp {
             });
         }
         
-        let mut markdown_editors = Vec::new();
-        markdown_editors.push(MarkdownTab {
+        let markdown_editors = vec![MarkdownTab {
             name: "Dokument 1".to_string(),
             editor: MarkdownEditor::default(),
-        });
+        }];
         
         Self {
             selected: 0,
@@ -394,7 +396,7 @@ impl GuiApp {
         self.sidebar_collapsed = settings.sidebar_collapsed;
 
         // Terminal settings
-        self.scrollback_lines = settings.scrollback_lines.max(100).min(100000);
+        self.scrollback_lines = settings.scrollback_lines.clamp(100, 100000);
 
         // Propagate to existing terminals
         for t in &mut self.terminals {
@@ -436,8 +438,8 @@ impl GuiApp {
     fn handle_keyboard_shortcuts(&mut self, ctx: &egui::Context) {
         ctx.input(|i| {
             // Ctrl+T: New Terminal Tab
-            if i.modifiers.ctrl && i.key_pressed(egui::Key::T) {
-                if self.selected == 0 { // Only in Terminal view
+            if i.modifiers.ctrl && i.key_pressed(egui::Key::T)
+                && self.selected == 0 { // Only in Terminal view
                     if let Ok(mut term) = TerminalView::new(self.scrollback_lines) {
                         term.text_color = self.terminal_text_color;
                         term.cursor_color = self.cursor_color;
@@ -450,7 +452,6 @@ impl GuiApp {
                         self.active_terminal_tab = self.terminals.len() - 1;
                     }
                 }
-            }
 
             // Ctrl+W: Close active tab
             if i.modifiers.ctrl && i.key_pressed(egui::Key::W) {
@@ -536,28 +537,25 @@ impl GuiApp {
             }
 
             // Ctrl+H: Horizontal split
-            if i.modifiers.ctrl && i.key_pressed(egui::Key::H) {
-                if self.selected == 0 { // Only in Terminal view
+            if i.modifiers.ctrl && i.key_pressed(egui::Key::H)
+                && self.selected == 0 { // Only in Terminal view
                     self.create_split(SplitOrientation::Horizontal);
                 }
-            }
 
             // Ctrl+V: Vertical split (when Shift is pressed to avoid paste conflict)
-            if i.modifiers.ctrl && i.modifiers.shift && i.key_pressed(egui::Key::V) {
-                if self.selected == 0 { // Only in Terminal view
+            if i.modifiers.ctrl && i.modifiers.shift && i.key_pressed(egui::Key::V)
+                && self.selected == 0 { // Only in Terminal view
                     self.create_split(SplitOrientation::Vertical);
                 }
-            }
 
             // Ctrl+1-9: Switch between split panes
             for (idx, key) in [egui::Key::Num1, egui::Key::Num2, egui::Key::Num3, 
                               egui::Key::Num4, egui::Key::Num5, egui::Key::Num6,
                               egui::Key::Num7, egui::Key::Num8, egui::Key::Num9].iter().enumerate() {
-                if i.modifiers.ctrl && i.key_pressed(*key) {
-                    if idx < self.split_panes.len() {
+                if i.modifiers.ctrl && i.key_pressed(*key)
+                    && idx < self.split_panes.len() {
                         self.active_pane = idx;
                     }
-                }
             }
         });
     }
@@ -782,11 +780,10 @@ impl App for GuiApp {
                                     if ui.small_button("✏").on_hover_text("Umbenennen").clicked() {
                                         to_rename = Some(idx);
                                     }
-                                    if self.terminals.len() > 1 {
-                                        if ui.small_button("×").on_hover_text("Schließen (Strg+W)").clicked() {
+                                    if self.terminals.len() > 1
+                                        && ui.small_button("×").on_hover_text("Schließen (Strg+W)").clicked() {
                                             to_close = Some(idx);
                                         }
-                                    }
                                 });
                             });
                         }
@@ -939,11 +936,10 @@ impl App for GuiApp {
                                     if ui.small_button("✏").on_hover_text("Umbenennen").clicked() {
                                         to_rename = Some(idx);
                                     }
-                                    if self.markdown_editors.len() > 1 {
-                                        if ui.small_button("×").on_hover_text("Schließen (Strg+W)").clicked() {
+                                    if self.markdown_editors.len() > 1
+                                        && ui.small_button("×").on_hover_text("Schließen (Strg+W)").clicked() {
                                             to_close = Some(idx);
                                         }
-                                    }
                                 });
                             });
                         }
@@ -1244,7 +1240,7 @@ impl App for GuiApp {
                         ui.separator();
                         ui.label(format!("🖥️ Plattform: {}", std::env::consts::OS));
                         ui.label(format!("🦀 Rust Version: {}", rustc_version_runtime::version()));
-                        ui.label(format!("📦 TermiX Version: 0.1.0"));
+                        ui.label("📦 TermiX Version: 0.1.0".to_string());
                     });
                 }
                 4 => {
@@ -1804,7 +1800,7 @@ impl TerminalView {
                             let mut eff_fg = fg;
                             let mut eff_bg = bg;
                             if inverse {
-                                std::mem::swap(&mut eff_fg, &mut eff_bg.get_or_insert(self.text_color));
+                                std::mem::swap(&mut eff_fg, eff_bg.get_or_insert(self.text_color));
                             }
                             (ch.to_string(), eff_fg, eff_bg)
                         };

@@ -1,87 +1,162 @@
 # TermiX - Modern Terminal Application
 
-**TermiX** is a next-generation portable terminal application that runs on both Linux and Windows platforms. It combines the power of traditional terminals with modern UI features.
+![Version](https://img.shields.io/badge/version-0.1.0-blue)
+![Rust](https://img.shields.io/badge/rust-1.82%2B-orange)
+![License](https://img.shields.io/badge/license-MIT-green)
+
+**TermiX** is a next-generation portable terminal application built with Rust. It combines the power of traditional terminals with modern UI features and runs on both Linux and Windows platforms.
 
 ## ✨ Features
 
-- **Multi-Tab Support** - Run multiple terminals and markdown editors simultaneously
-- **Smart Command Suggestions** - Auto-completion for 50+ common shell commands
-- **Cross-Platform** - Runs seamlessly on Linux and Windows
-- **Dual Interface** - Terminal UI (TUI) and Graphical UI (GUI)
-- **Embedded PTY Terminal** - Full shell integration with live output
-- **SSH Connection Manager** - Save and manage SSH connections
-- **Markdown Editor** - Built-in editor with live preview
-- **Customizable** - Dark/Light themes, font scaling
-- **Green Cursor** - Visual indicator for active input position
+### Core Functionality
+- 🖥️ **Multi-Tab Support** - Run multiple terminals and markdown editors simultaneously
+- 💡 **Smart Command Suggestions** - Auto-completion for 50+ common shell commands (Tab to complete)
+- 🌈 **ANSI Color Support** - Full 16/256/Truecolor terminal rendering
+- 📜 **Configurable Scrollback** - 100-10,000 lines of terminal history
+- ⌨️ **Keyboard Shortcuts** - Ctrl+T (new tab), Ctrl+W (close), Ctrl+Tab (navigate), and more
+
+### Advanced Features
+- 🔗 **SSH Connection Manager** - Save, manage, and connect to remote servers
+- ✂️ **Split-View Terminals** - Horizontal/vertical splits with Ctrl+H / Ctrl+Shift+V
+- 📝 **Markdown Editor** - Built-in editor with live preview
+- 💾 **Settings Persistence** - All configurations auto-saved to ~/.config/termix/
+- 📤 **Import/Export** - Backup and restore settings and SSH connections
+
+### Customization
+- 🎨 **7 Built-in Themes** - Dark, Light, Dracula, Monokai, Solarized, Nord, Gruvbox
+- 🔠 **Font Scaling** - Adjust text size with Ctrl+Plus/Minus/0
+- 🎯 **Customizable Cursor** - 6 cursor styles with blinking support
+- 🌍 **Cross-Platform** - Runs seamlessly on Linux and Windows
+- 🖼️ **Dual Interface** - Terminal UI (TUI) and Graphical UI (GUI)
 
 ## 🚀 Quick Start
 
-### Installation
+### Prerequisites
 
-1. Install dependencies (Linux):
+**Rust 1.82 or higher** is required. Install from [rustup.rs](https://rustup.rs/)
+
+**Linux dependencies:**
+```bash
+sudo apt-get install pkg-config libssl-dev
+```
+
+### Installation from Source
+
+1. **Clone the repository:**
    ```bash
-   sudo apt-get install pkg-config libssl-dev
+   git clone https://github.com/janquillfeldt/terminal-app.git
+   cd terminal-app
    ```
 
-2. Clone and build:
+2. **Build the project:**
    ```bash
-   git clone <repository-url>
-   cd termix
-   cargo build --release
+   cargo build --release --features gui
    ```
 
-### Running TermiX
+3. **Run TermiX:**
+   ```bash
+   ./target/release/termix
+   ```
 
-Start with the convenient launcher script:
+### Using the Launcher Script
 
-- **GUI Mode** (Recommended):
-  ```bash
-  ./start.sh --gui
-  ```
+The included `start.sh` script provides convenient build and run options:
 
-- **TUI Mode** (Terminal UI):
-  ```bash
-  ./start.sh --tui
-  ```
+**GUI Mode** (Recommended):
+```bash
+./start.sh --gui
+```
 
-- **Release Build**:
-  ```bash
-  ./start.sh --gui --release
-  ```
-    - Debug/Release:
-       ```bash
-       ./start.sh --tui          # Debug
-       ./start.sh --tui --release  # Release
-       ```
+**TUI Mode** (Terminal UI):
+```bash
+./start.sh --tui
+```
 
-3. Direkt per Cargo:
-    - TUI:
-       ```bash
-       cargo run --
-       ```
-    - GUI (Feature aktivieren):
-       ```bash
-       cargo run --features gui --
-       ```
+**Release Builds** (optimized, slower compile):
+```bash
+./start.sh --gui --release
+./start.sh --tui --release
+```
 
-## Usage Guidelines
+**Direct Cargo Commands:**
+```bash
+# TUI (default)
+cargo run --release
 
-- TUI: Pfeiltasten ↑/↓, Enter zum Auswählen, ESC/Q zum Beenden
-- GUI:
-   - Terminal-Panel: Eingabefeld unten, Enter oder "Ausführen"
-   - Einstellungen: Dark Mode, Schrift-Skalierung
-   - Über: Systeminfos (OS, Rust-Version)
-   - Beenden: schließt das Fenster
+# GUI
+cargo run --release --features gui
+```
 
-## Contributing
+### Binary Releases
 
-Contributions are welcome! Please submit a pull request or open an issue for any enhancements or bug fixes.
+Pre-built binaries for Linux and Windows are available on the [Releases page](https://github.com/janquillfeldt/terminal-app/releases).
 
-## Support
+Simply download, extract, and run!
+
+## 📖 Usage Guide
+
+### GUI Mode
+
+**Navigation:**
+- 🖥️ **Terminal** - Multi-tab terminal with command suggestions
+- 🔗 **SSH Connections** - Manage and connect to remote servers
+- 📝 **Markdown** - Write and preview markdown documents
+- ⚙️ **Settings** - Customize themes, colors, fonts, and behavior
+- ℹ️ **About** - View system information and version details
+
+**Keyboard Shortcuts:**
+- `Ctrl+T` - New terminal tab
+- `Ctrl+W` - Close active tab
+- `Ctrl+Tab` / `Ctrl+Shift+Tab` - Navigate tabs
+- `Ctrl+H` - Horizontal split
+- `Ctrl+Shift+V` - Vertical split
+- `Ctrl+1-9` - Switch between split panes
+- `Ctrl+Plus/Minus/0` - Zoom in/out/reset
+- `PageUp/PageDown` - Scroll terminal
+
+**Terminal Features:**
+- Type commands and press `Tab` for auto-completion
+- Use arrow keys `↑↓` to select suggestions
+- Command history available with arrow keys in terminal
+- Drag tabs to reorder, Ctrl+Click to close
+
+### TUI Mode
+
+**Navigation:**
+- `↑↓` - Navigate menu items
+- `Enter` - Select option
+- `ESC` or `Q` - Exit application
+
+### Settings Persistence
+
+All settings are automatically saved to:
+- **Linux/macOS:** `~/.config/termix/settings.toml`
+- **Windows:** `%APPDATA%\termix\settings.toml`
+
+SSH connections are stored in `ssh_connections.toml` in the working directory.
+
+## 🤝 Contributing
+
+Contributions are welcome! Here's how you can help:
+
+1. **Fork the repository**
+2. **Create a feature branch** (`git checkout -b feature/amazing-feature`)
+3. **Commit your changes** (`git commit -m 'Add amazing feature'`)
+4. **Push to the branch** (`git push origin feature/amazing-feature`)
+5. **Open a Pull Request**
+
+Please ensure your code:
+- Builds without warnings (`cargo clippy`)
+- Follows Rust formatting (`cargo fmt`)
+- Includes appropriate tests where applicable
+
+## 💖 Support
 
 If you find TermiX useful, consider supporting the development:
 
-☕ [Buy Me a Coffee](https://buymeacoffee.com/janquillfeldt)
+<a href="https://www.buymeacoffee.com/janquillfeldt" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" style="height: 60px !important;width: 217px !important;" ></a>
+
+Your support helps maintain and improve TermiX!
 
 ## License
 

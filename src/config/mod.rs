@@ -87,7 +87,7 @@ pub fn settings_path() -> PathBuf {
             return home.join(".config").join("termix").join("settings.toml");
         }
         // Fallback
-        return PathBuf::from("settings.toml");
+        PathBuf::from("settings.toml")
     }
 }
 
@@ -98,10 +98,7 @@ fn dirs_home() -> Option<PathBuf> {
 pub fn load_settings() -> AppSettings {
     let path = settings_path();
     if let Ok(content) = fs::read_to_string(&path) {
-        match toml::from_str::<AppSettings>(&content) {
-            Ok(s) => s,
-            Err(_) => AppSettings::default(),
-        }
+        toml::from_str::<AppSettings>(&content).unwrap_or_default()
     } else {
         AppSettings::default()
     }

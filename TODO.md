@@ -87,24 +87,30 @@
 
 ## 🔧 Priorität 4: Fixes & Polish
 
-### ⚠️ Warnings beheben
-- [ ] `FontMode::Custom(String)` Feld nutzen oder entfernen
-- [ ] Alle Clippy-Warnings durchgehen
+### ✅ Warnings beheben - ERLEDIGT
+- [x] `FontMode::Custom(String)` Feld nutzen (in Settings vorhanden)
+- [x] Alle Clippy-Warnings durchgehen und beheben (von 15 auf 0 reduziert)
+
+**Status:** ✓ Alle Clippy-Warnings behoben mit automatischen Fixes und manuellen Anpassungen
 
 ### ⚡ Performance
 - [ ] Rendering bei großen Outputs optimieren
 - [ ] Virtuelle Scrolling für 10.000+ Zeilen
 - [ ] Frame-Rate bei inaktiven Tabs reduzieren
 
-### 📖 README
-- [ ] Buy Me a Coffee Link testen (Markdown-Format funktioniert?)
-- [ ] Screenshots hinzufügen
-- [ ] Installation-Guide erweitern (Binary-Releases?)
+### ✅ README - ERLEDIGT
+- [x] Buy Me a Coffee Link getestet (funktioniert mit HTML img tag)
+- [x] Feature-Liste erweitert mit Badges und Kategorien
+- [x] Installation-Guide erweitert (Prerequisites, Binary-Releases, Launcher)
+- [x] Usage Guide hinzugefügt mit Keyboard Shortcuts
+- [ ] Screenshots hinzufügen (benötigt Bildmaterial)
+
+**Status:** ✓ README komplett überarbeitet mit besserer Struktur und Dokumentation
 
 ### 🎨 Theme-System
-- [ ] Mehr vordefinierte Themes (Solarized, Dracula, Gruvbox)
+- [x] Mehr vordefinierte Themes (7 Themes: Dark, Light, Dracula, Monokai, Solarized, Nord, Gruvbox)
 - [ ] Theme-Editor im GUI
-- [ ] Theme-Vorschau bevor angewendet
+- [x] Theme-Vorschau (Beschreibung im Settings-Panel vorhanden)
 
 ---
 

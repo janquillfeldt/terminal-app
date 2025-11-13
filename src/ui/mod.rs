@@ -77,12 +77,10 @@ impl UI {
     }
 
     fn print_menu(&self, stdout: &mut impl Write) -> Result<()> {
-        let menu_items = vec![
-            "1. Terminal öffnen",
+        let menu_items = ["1. Terminal öffnen",
             "2. Einstellungen",
             "3. Über diese Anwendung",
-            "4. Beenden",
-        ];
+            "4. Beenden"];
 
         execute!(
             stdout,
