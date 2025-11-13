@@ -1,5 +1,6 @@
 #[cfg(feature = "gui")]
 mod gui;
+mod config;
 mod ui;
 
 use ui::UI; // Immer verfügbar, auch wenn im GUI-Build nur als Fallback genutzt

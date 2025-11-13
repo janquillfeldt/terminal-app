@@ -1,5 +1,5 @@
 #[cfg(feature = "gui")]
-use eframe::{egui, App, Frame};
+use eframe::{egui, App, Frame, CreationContext};
 #[cfg(feature = "gui")]
 use std::{
     io::{Read, Write},
@@ -13,6 +13,7 @@ use portable_pty::{CommandBuilder, NativePtySystem, PtySize, PtySystem, MasterPt
 use vt100::Parser as VtParser;
 #[cfg(feature = "gui")]
 use pulldown_cmark::{Parser as MdParser, Event, Tag, HeadingLevel};
+use crate::config::{AppSettings, Rgba, load_settings, save_settings};
 
 #[cfg(feature = "gui")]
 #[derive(Clone, Copy, PartialEq)]
@@ -37,6 +38,17 @@ impl Theme {
             Theme::SolarizedDark => "Solarized Dark",
             Theme::Nord => "Nord",
             Theme::GruvboxDark => "Gruvbox Dark",
+        }
+    }
+    fn from_name(name: &str) -> Self {
+        match name {
+            "Light" => Theme::Light,
+            "Dracula" => Theme::Dracula,
+            "Monokai" => Theme::Monokai,
+            "Solarized Dark" => Theme::SolarizedDark,
+            "Nord" => Theme::Nord,
+            "Gruvbox Dark" => Theme::GruvboxDark,
+            _ => Theme::Dark,
         }
     }
     
@@ -112,6 +124,24 @@ enum FontMode {
 }
 
 #[cfg(feature = "gui")]
+impl FontMode {
+    fn id(&self) -> &'static str {
+        match self {
+            FontMode::Default => "Default",
+            FontMode::MonospaceEverywhere => "MonospaceEverywhere",
+            FontMode::Custom(_) => "Custom",
+        }
+    }
+    fn from_id(id: &str, info: Option<String>) -> Self {
+        match id {
+            "MonospaceEverywhere" => FontMode::MonospaceEverywhere,
+            "Custom" => FontMode::Custom(info.unwrap_or_default()),
+            _ => FontMode::Default,
+        }
+    }
+}
+
+#[cfg(feature = "gui")]
 #[derive(Clone, Copy, PartialEq)]
 enum CursorShape {
     Block,          // █
@@ -124,6 +154,26 @@ enum CursorShape {
 
 #[cfg(feature = "gui")]
 impl CursorShape {
+    fn id(&self) -> &'static str {
+        match self {
+            CursorShape::Block => "Block",
+            CursorShape::Underline => "Underline",
+            CursorShape::VerticalBar => "VerticalBar",
+            CursorShape::DoubleUnderscore => "DoubleUnderscore",
+            CursorShape::Box => "Box",
+            CursorShape::Cross => "Cross",
+        }
+    }
+    fn from_id(id: &str) -> Self {
+        match id {
+            "Underline" => CursorShape::Underline,
+            "VerticalBar" => CursorShape::VerticalBar,
+            "DoubleUnderscore" => CursorShape::DoubleUnderscore,
+            "Box" => CursorShape::Box,
+            "Cross" => CursorShape::Cross,
+            _ => CursorShape::Block,
+        }
+    }
     fn name(&self) -> &str {
         match self {
             CursorShape::Block => "Block █",
@@ -244,6 +294,109 @@ impl Default for GuiApp {
 #[cfg(feature = "gui")]
 impl GuiApp {
     // TerminalView handles PTY IO
+    fn color_to_rgba(c: egui::Color32) -> Rgba {
+        let [r, g, b, a] = c.to_srgba_unmultiplied();
+        Rgba { r, g, b, a }
+    }
+
+    fn color_from_rgba(rgba: Rgba) -> egui::Color32 {
+        egui::Color32::from_rgba_unmultiplied(rgba.r, rgba.g, rgba.b, rgba.a)
+    }
+
+    fn apply_settings(&mut self, settings: &AppSettings, ctx: &egui::Context) {
+        // Theme
+        self.current_theme = Theme::from_name(&settings.theme);
+        self.current_theme.apply(ctx);
+        // Font scale
+        self.font_scale = settings.font_scale.clamp(0.5, 3.0);
+        ctx.set_pixels_per_point(self.font_scale);
+        // Colors
+        self.terminal_text_color = Self::color_from_rgba(settings.terminal_text_color);
+        self.markdown_text_color = Self::color_from_rgba(settings.markdown_text_color);
+        self.ssh_text_color = Self::color_from_rgba(settings.ssh_text_color);
+        self.cursor_color = Self::color_from_rgba(settings.cursor_color);
+        // Cursor
+        self.cursor_shape = CursorShape::from_id(&settings.cursor_shape);
+        self.cursor_blinking = settings.cursor_blinking;
+        // Font mode
+        self.font_mode = FontMode::from_id(&settings.font_mode, settings.custom_font_path.clone());
+        match &self.font_mode {
+            FontMode::Default => {
+                let defs = egui::FontDefinitions::default();
+                ctx.set_fonts(defs);
+                self.custom_font_info = None;
+            }
+            FontMode::MonospaceEverywhere => {
+                let mut defs = egui::FontDefinitions::default();
+                if let Some(mono) = defs.families.get(&egui::FontFamily::Monospace).cloned() {
+                    defs.families.insert(egui::FontFamily::Proportional, mono);
+                }
+                ctx.set_fonts(defs);
+                self.custom_font_info = None;
+            }
+            FontMode::Custom(name_or_path) => {
+                // Try to (re)load from path if available
+                if let Some(path) = settings.custom_font_path.as_ref() {
+                    if let Ok(bytes) = std::fs::read(path) {
+                        let mut defs = egui::FontDefinitions::default();
+                        defs.font_data.insert("user".into(), egui::FontData::from_owned(bytes));
+                        defs.families.insert(egui::FontFamily::Proportional, vec!["user".to_string()]);
+                        defs.families.insert(egui::FontFamily::Monospace, vec!["user".to_string()]);
+                        ctx.set_fonts(defs);
+                        self.custom_font_info = Some(path.clone());
+                        self.font_mode = FontMode::Custom("user".into());
+                    } else {
+                        // Fallback to default fonts if file missing
+                        let defs = egui::FontDefinitions::default();
+                        ctx.set_fonts(defs);
+                        self.custom_font_info = None;
+                        self.font_mode = FontMode::Default;
+                    }
+                } else {
+                    // Keep current fonts as-is; ensure flag stays consistent
+                    let _ = name_or_path;
+                }
+            }
+        }
+
+        // Sidebar state
+        self.sidebar_collapsed = settings.sidebar_collapsed;
+
+        // Propagate to existing terminals
+        for t in &mut self.terminals {
+            t.terminal.text_color = self.terminal_text_color;
+            t.terminal.cursor_color = self.cursor_color;
+            t.terminal.cursor_shape = self.cursor_shape;
+            t.terminal.cursor_blinking = self.cursor_blinking;
+        }
+    }
+
+    fn to_settings(&self) -> AppSettings {
+        AppSettings {
+            theme: self.current_theme.name().to_string(),
+            font_scale: self.font_scale,
+            terminal_text_color: Self::color_to_rgba(self.terminal_text_color),
+            markdown_text_color: Self::color_to_rgba(self.markdown_text_color),
+            ssh_text_color: Self::color_to_rgba(self.ssh_text_color),
+            cursor_color: Self::color_to_rgba(self.cursor_color),
+            cursor_shape: self.cursor_shape.id().into(),
+            cursor_blinking: self.cursor_blinking,
+            font_mode: self.font_mode.id().into(),
+            custom_font_path: self.custom_font_info.clone(),
+            sidebar_collapsed: self.sidebar_collapsed,
+        }
+    }
+
+    fn save_settings(&self) {
+        save_settings(&self.to_settings());
+    }
+
+    pub fn new(cc: &CreationContext<'_>) -> Self {
+        let mut app = GuiApp::default();
+        let settings = load_settings();
+        app.apply_settings(&settings, &cc.egui_ctx);
+        app
+    }
 }
 
 #[cfg(feature = "gui")]
@@ -297,6 +450,7 @@ impl App for GuiApp {
                 let toggle_icon = if self.sidebar_collapsed { "☰" } else { "◀" };
                 if ui.button(egui::RichText::new(toggle_icon).size(20.0)).clicked() {
                     self.sidebar_collapsed = !self.sidebar_collapsed;
+                    self.save_settings();
                 }
                 if !self.sidebar_collapsed {
                     ui.heading("Hauptmenü");
@@ -526,6 +680,7 @@ impl App for GuiApp {
                                     let selected = self.current_theme == theme;
                                     if ui.selectable_label(selected, theme.name()).clicked() {
                                         self.current_theme = theme;
+                                        self.save_settings();
                                     }
                                 }
                             });
@@ -565,15 +720,24 @@ impl App for GuiApp {
                                 for t in &mut self.terminals {
                                     t.terminal.text_color = c;
                                 }
+                                self.save_settings();
                             }
                         });
                         ui.horizontal(|ui| {
                             ui.label("Markdown Textfarbe:");
-                            ui.color_edit_button_srgba(&mut self.markdown_text_color);
+                            let mut c = self.markdown_text_color;
+                            if ui.color_edit_button_srgba(&mut c).changed() {
+                                self.markdown_text_color = c;
+                                self.save_settings();
+                            }
                         });
                         ui.horizontal(|ui| {
                             ui.label("SSH Textfarbe:");
-                            ui.color_edit_button_srgba(&mut self.ssh_text_color);
+                            let mut c = self.ssh_text_color;
+                            if ui.color_edit_button_srgba(&mut c).changed() {
+                                self.ssh_text_color = c;
+                                self.save_settings();
+                            }
                         });
                         ui.horizontal(|ui| {
                             ui.label("Cursor Farbe:");
@@ -584,6 +748,7 @@ impl App for GuiApp {
                                 for t in &mut self.terminals {
                                     t.terminal.cursor_color = c;
                                 }
+                                self.save_settings();
                             }
                         });
                     });
@@ -609,6 +774,7 @@ impl App for GuiApp {
                                             for t in &mut self.terminals {
                                                 t.terminal.cursor_shape = shape;
                                             }
+                                            self.save_settings();
                                         }
                                     }
                                 });
@@ -621,6 +787,7 @@ impl App for GuiApp {
                                 for t in &mut self.terminals {
                                     t.terminal.cursor_blinking = blink;
                                 }
+                                self.save_settings();
                             }
                         });
                     });
@@ -639,13 +806,16 @@ impl App for GuiApp {
                                 if ui.selectable_label(matches!(self.font_mode, FontMode::Default), "Standard").clicked() {
                                     self.font_mode = FontMode::Default;
                                     self.custom_font_info = None;
+                                    self.save_settings();
                                 }
                                 if ui.selectable_label(matches!(self.font_mode, FontMode::MonospaceEverywhere), "Monospace überall").clicked() {
                                     self.font_mode = FontMode::MonospaceEverywhere;
                                     self.custom_font_info = None;
+                                    self.save_settings();
                                 }
                                 if ui.selectable_label(matches!(self.font_mode, FontMode::Custom(_)), "Benutzerdefiniert").clicked() {
                                     self.font_mode = FontMode::Custom(String::new());
+                                    self.save_settings();
                                 }
                             });
 
@@ -662,6 +832,7 @@ impl App for GuiApp {
                                             ui.ctx().set_fonts(defs);
                                             self.custom_font_info = Some(path.display().to_string());
                                             self.font_mode = FontMode::Custom("user".into());
+                                            self.save_settings();
                                         }
                                     }
                                 }
@@ -670,6 +841,7 @@ impl App for GuiApp {
                                     if ui.button("Zurücksetzen").clicked() {
                                         self.custom_font_info = None;
                                         self.font_mode = FontMode::Default;
+                                        self.save_settings();
                                     }
                                 }
                             });
@@ -679,7 +851,11 @@ impl App for GuiApp {
                     // Font scale
                     ui.horizontal(|ui| {
                         ui.label(egui::RichText::new("📏 Schriftgröße:").strong());
-                        ui.add(egui::Slider::new(&mut self.font_scale, 0.75..=2.0).text("Skalierung"));
+                        let mut tmp = self.font_scale;
+                        if ui.add(egui::Slider::new(&mut tmp, 0.75..=2.0).text("Skalierung")).changed() {
+                            self.font_scale = tmp;
+                            self.save_settings();
+                        }
                     });
                     
                     ui.add_space(15.0);
@@ -819,7 +995,7 @@ pub fn run_gui() -> eframe::Result<()> {
     eframe::run_native(
         "TermiX",
         options,
-        Box::new(|_cc| Box::new(GuiApp::default())),
+        Box::new(|cc| Box::new(GuiApp::new(cc))),
     )
 }
 
@@ -1013,68 +1189,69 @@ impl TerminalView {
                 self.resize(cols, rows);
             }
 
-            // Render VT screen first (before input handling to ensure visibility)
+            // Render VT screen with ANSI colors using cell-based iteration
             let _scroll_output = egui::ScrollArea::both()
                 .auto_shrink([false, false])
                 .show(ui, |ui| {
+                use egui::text::LayoutJob;
                 let screen = self.parser.screen();
-                let contents = screen.contents();
-                let lines: Vec<&str> = contents.lines().collect();
-                
-                // Get cursor position from vt100
+                // Cursor position from vt100 (1-based columns -> we use saturating_sub(1))
                 let (cursor_row, cursor_col) = screen.cursor_position();
                 let display_col: u16 = cursor_col.saturating_sub(1);
-                
-                if lines.is_empty() {
-                    ui.colored_label(egui::Color32::from_rgb(150, 150, 150), "[Terminal bereit - tippe einen Befehl]");
-                    // Show cursor at start
-                    if self.cursor_visible {
-                        ui.horizontal(|ui| {
-                            ui.colored_label(self.cursor_color, self.cursor_shape.render(' '));
-                        });
-                    }
-                } else {
-                    // Render each line with cursor overlay
-                    for (row_idx, line) in lines.iter().enumerate() {
-                        if row_idx == cursor_row as usize {
-                            // This line contains the cursor
-                            ui.horizontal(|ui| {
-                                let chars: Vec<char> = line.chars().collect();
-                                
-                                // Render characters before cursor in chosen color
-                                if display_col > 0 {
-                                    let before: String = chars.iter().take(display_col as usize).collect();
-                                    ui.colored_label(self.text_color, 
-                                        egui::RichText::new(&before).monospace());
-                                }
-                                
-                                // Render cursor with chosen shape
-                                if self.cursor_visible {
-                                    let cursor_char = chars.get(display_col as usize).unwrap_or(&' ');
-                                    ui.colored_label(self.cursor_color, 
-                                        self.cursor_shape.render(*cursor_char));
-                                } else {
-                                    // When cursor is hidden during blink, show space
-                                    let cursor_char = chars.get(display_col as usize).unwrap_or(&' ');
-                                    if *cursor_char != ' ' {
-                                        ui.colored_label(self.text_color, 
-                                            egui::RichText::new(format!("{}", cursor_char)).monospace());
-                                    }
-                                }
-                                
-                                // Render characters after cursor in chosen color
-                                if (display_col as usize) < chars.len().saturating_sub(1) {
-                                    let after: String = chars.iter().skip(display_col as usize + 1).collect();
-                                    ui.colored_label(self.text_color, 
-                                        egui::RichText::new(&after).monospace());
-                                }
-                            });
-                        } else {
-                            // Normal line without cursor - chosen text color
-                            ui.colored_label(self.text_color, 
-                                egui::RichText::new(*line).monospace());
+
+                let rows = self.rows as usize;
+                let cols = self.cols as usize;
+                let font_id = egui::TextStyle::Monospace.resolve(ui.style());
+
+                for row in 0..rows {
+                    let mut job = LayoutJob::default();
+                    for col in 0..cols {
+                        // Fetch cell; fallback to space if out of bounds/missing
+                        let mut ch: char = ' ';
+                        let mut fg = self.text_color;
+                        let mut bg: Option<egui::Color32> = None;
+                        let mut inverse = false;
+                        // vt100 cell API (try common method names; compile will guide adjustments)
+                        if let Some(cell) = screen.cell(row as u16, col as u16) {
+                            // character
+                            let s = cell.contents();
+                            ch = s.chars().next().unwrap_or(' ');
+                            // colors (always provided as a Color; Default means fallback)
+                            let c_fg = cell.fgcolor();
+                            fg = vt_color_to_egui(c_fg, self.text_color);
+                            let c_bg = cell.bgcolor();
+                            let bg_c = vt_color_to_egui(c_bg, egui::Color32::TRANSPARENT);
+                            if bg_c != egui::Color32::TRANSPARENT { bg = Some(bg_c); }
+                            // attributes
+                            if cell.inverse() { inverse = true; }
                         }
+
+                        // Integrate cursor rendering by replacing the cell at cursor position
+                        let is_cursor_cell = self.cursor_visible && (row as u16 == cursor_row) && (col as u16 == display_col);
+                        let (text, txt_fg, txt_bg) = if is_cursor_cell {
+                            // Draw cursor with chosen shape/color, ignoring underlying bg
+                            let rendered = self.cursor_shape.render(ch);
+                            (rendered, self.cursor_color, None)
+                        } else {
+                            let mut eff_fg = fg;
+                            let mut eff_bg = bg;
+                            if inverse {
+                                std::mem::swap(&mut eff_fg, &mut eff_bg.get_or_insert(self.text_color));
+                            }
+                            (ch.to_string(), eff_fg, eff_bg)
+                        };
+
+                        let mut format = egui::TextFormat { font_id: font_id.clone(), color: txt_fg, ..Default::default() };
+                        // Background color if present
+                        #[allow(deprecated)]
+                        {
+                            if let Some(bgc) = txt_bg {
+                                format.background = bgc;
+                            }
+                        }
+                        job.append(&text, 0.0, format);
                     }
+                    ui.label(job);
                 }
             });
 
@@ -1174,8 +1351,71 @@ impl TerminalView {
     }
 }
 
-// vt_color_to_egui helper omitted for now; would be used with cell-level rendering
-// when upgrading to vt100 that exposes cell API or custom parser
+// Map vt100 colors to egui::Color32
+#[cfg(feature = "gui")]
+fn vt_color_to_egui(c: vt100::Color, default: egui::Color32) -> egui::Color32 {
+    use vt100::Color;
+    match c {
+        Color::Default => default,
+        Color::Rgb(r, g, b) => egui::Color32::from_rgb(r, g, b),
+        // Fallback: 256-color indexed palette
+        other => {
+            if let Some(idx) = color_to_index(other) {
+                ansi256_to_rgb(idx).unwrap_or(default)
+            } else {
+                default
+            }
+        }
+    }
+}
+
+#[cfg(feature = "gui")]
+fn color_to_index(c: vt100::Color) -> Option<u8> {
+    match c {
+        vt100::Color::Idx(i) => Some(i),
+        _ => None,
+    }
+}
+
+#[cfg(feature = "gui")]
+fn ansi256_to_rgb(i: u8) -> Option<egui::Color32> {
+    let idx = i as u16;
+    if idx <= 15 {
+        let (r, g, b) = match idx {
+            0 => (0, 0, 0),
+            1 => (128, 0, 0),
+            2 => (0, 128, 0),
+            3 => (128, 128, 0),
+            4 => (0, 0, 128),
+            5 => (128, 0, 128),
+            6 => (0, 128, 128),
+            7 => (192, 192, 192),
+            8 => (128, 128, 128),
+            9 => (255, 0, 0),
+            10 => (0, 255, 0),
+            11 => (255, 255, 0),
+            12 => (0, 0, 255),
+            13 => (255, 0, 255),
+            14 => (0, 255, 255),
+            15 => (255, 255, 255),
+            _ => (255, 255, 255),
+        };
+        return Some(egui::Color32::from_rgb(r, g, b));
+    }
+    if (16..=231).contains(&idx) {
+        let n = idx - 16;
+        let r = n / 36;
+        let g = (n % 36) / 6;
+        let b = n % 6;
+        let conv = |v: u16| -> u8 { [0, 95, 135, 175, 215, 255][v as usize] };
+        return Some(egui::Color32::from_rgb(conv(r), conv(g), conv(b)));
+    }
+    if (232..=255).contains(&idx) {
+        let l = (8 + (idx - 232) * 10) as u8;
+        return Some(egui::Color32::from_rgb(l, l, l));
+    }
+    None
+}
 
 // ===================== Markdown Editor =====================
 #[cfg(feature = "gui")]
