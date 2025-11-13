@@ -144,12 +144,12 @@ impl FontMode {
 #[cfg(feature = "gui")]
 #[derive(Clone, Copy, PartialEq)]
 enum CursorShape {
-    Block,          // █
-    Underline,      // _
-    VerticalBar,    // |
-    DoubleUnderscore, // ‗ (thick underline)
-    Box,            // ▯ (hollow block)
-    Cross,          // ╳
+    Block,
+    Underline,
+    VerticalBar,
+    DoubleUnderscore,
+    Box,
+    Cross,
 }
 
 #[cfg(feature = "gui")]
@@ -166,6 +166,7 @@ impl CursorShape {
     }
     fn from_id(id: &str) -> Self {
         match id {
+            "Block" => CursorShape::Block,
             "Underline" => CursorShape::Underline,
             "VerticalBar" => CursorShape::VerticalBar,
             "DoubleUnderscore" => CursorShape::DoubleUnderscore,
@@ -242,6 +243,8 @@ pub struct GuiApp {
     ssh_password_prompt: Option<(SshConnection, String)>, // (connection, password_input)
     // Terminal settings
     scrollback_lines: usize,
+    // Drag state for terminal tabs
+    dragging_terminal_tab: Option<usize>,
 }
 
 #[cfg(feature = "gui")]
@@ -296,6 +299,7 @@ impl Default for GuiApp {
             pending_ssh_connection: None,
             ssh_password_prompt: None,
             scrollback_lines: 2000,
+            dragging_terminal_tab: None,
         }
     }
 }
@@ -675,11 +679,41 @@ impl App for GuiApp {
                     ui.horizontal(|ui| {
                         let mut to_close = None;
                         let mut to_rename = None;
+                        let mut hovered_tab: Option<usize> = None;
+                        let mut pending_reorder: Option<(usize, usize)> = None; // (from, to)
                         for (idx, tab) in self.terminals.iter().enumerate() {
                             let selected = idx == self.active_terminal_tab;
                             ui.group(|ui| {
-                                if ui.selectable_label(selected, &tab.name).clicked() {
-                                    self.active_terminal_tab = idx;
+                                // Tab label with drag + ctrl-click-to-close
+                                let label = egui::SelectableLabel::new(selected, &tab.name);
+                                let response = ui.add(label).on_hover_text("Strg+Klick: Schließen");
+                                if response.hovered() {
+                                    hovered_tab = Some(idx);
+                                }
+                                // Select on click (unless ctrl for close)
+                                let ctrl_down = ui.input(|i| i.modifiers.ctrl);
+                                if response.clicked() {
+                                    if ctrl_down {
+                                        to_close = Some(idx);
+                                    } else {
+                                        self.active_terminal_tab = idx;
+                                    }
+                                }
+                                // Start drag
+                                if response.drag_started() {
+                                    self.dragging_terminal_tab = Some(idx);
+                                }
+                                // Reorder on drop over another tab (defer mutation until after loop)
+                                if response.hovered() {
+                                    if let Some(drag_idx) = self.dragging_terminal_tab {
+                                        if ui.input(|i| i.pointer.any_released()) {
+                                            if drag_idx != idx {
+                                                let insert_at = if drag_idx < idx { idx - 1 } else { idx };
+                                                pending_reorder = Some((drag_idx, insert_at));
+                                            }
+                                            self.dragging_terminal_tab = None;
+                                        }
+                                    }
                                 }
                                 ui.horizontal(|ui| {
                                     if ui.small_button("✏").on_hover_text("Umbenennen").clicked() {
@@ -692,6 +726,15 @@ impl App for GuiApp {
                                     }
                                 });
                             });
+                        }
+                        if let Some((from, to)) = pending_reorder {
+                            if from < self.terminals.len() {
+                                let mut to_idx = to.min(self.terminals.len().saturating_sub(1));
+                                let item = self.terminals.remove(from);
+                                if from < to_idx { to_idx = to_idx.saturating_sub(1); }
+                                self.terminals.insert(to_idx, item);
+                                self.active_terminal_tab = to_idx;
+                            }
                         }
                         if ui.button("➕ Neues Terminal").on_hover_text("Strg+T").clicked() {
                             if let Ok(mut term) = TerminalView::new(self.scrollback_lines) {
@@ -706,6 +749,27 @@ impl App for GuiApp {
                                 self.active_terminal_tab = self.terminals.len() - 1;
                             }
                         }
+                        // Tab overview dropdown
+                        ui.menu_button("Tabs ▾", |ui| {
+                            for (i, tab) in self.terminals.iter().enumerate() {
+                                let selected = i == self.active_terminal_tab;
+                                if ui.selectable_label(selected, &tab.name).clicked() {
+                                    self.active_terminal_tab = i;
+                                    ui.close_menu();
+                                }
+                            }
+                            ui.separator();
+                            if ui.button("Alle schließen außer aktuellem").clicked() {
+                                let keep = self.active_terminal_tab;
+                                if keep < self.terminals.len() {
+                                    let keep_tab = self.terminals.remove(keep);
+                                    self.terminals.clear();
+                                    self.terminals.push(keep_tab);
+                                    self.active_terminal_tab = 0;
+                                }
+                                ui.close_menu();
+                            }
+                        });
                         ui.label(egui::RichText::new("Strg+W: Schließen | Strg+Tab: Wechseln").small().color(egui::Color32::GRAY));
                         
                         if let Some(idx) = to_rename {
@@ -1514,6 +1578,15 @@ impl TerminalView {
             .rounding(egui::Rounding::same(5.0));
         
         frame.show(ui, |ui| {
+            // Jump buttons
+            ui.horizontal(|ui| {
+                if ui.small_button("⤒").on_hover_text("Zum Anfang (Home)").clicked() {
+                    self.send_bytes(b"\x1b[H");
+                }
+                if ui.small_button("⤓").on_hover_text("Zum Ende (End)").clicked() {
+                    self.send_bytes(b"\x1b[F");
+                }
+            });
             // Estimate character cell size and compute rows/cols
             let char_w = ui.fonts(|f| f.glyph_width(&egui::TextStyle::Monospace.resolve(ui.style()), 'W'));
             let char_h = ui.text_style_height(&egui::TextStyle::Monospace);
@@ -1608,6 +1681,14 @@ impl TerminalView {
                     }
                     egui::Event::Key { key, pressed: true, modifiers, .. } => {
                         match key {
+                            egui::Key::PageUp => {
+                                // Send typical PageUp escape sequence
+                                self.send_bytes(b"\x1b[5~");
+                            }
+                            egui::Key::PageDown => {
+                                // Send typical PageDown escape sequence
+                                self.send_bytes(b"\x1b[6~");
+                            }
                             egui::Key::Enter => {
                                 self.input_buffer.clear();
                                 self.show_suggestions = false;
@@ -1656,6 +1737,13 @@ impl TerminalView {
                             }
                             egui::Key::D if modifiers.ctrl => self.send_bytes(&[0x04]),
                             _ => {}
+                        }
+                    }
+                    egui::Event::Scroll(delta) => {
+                        // Simple mousewheel to arrow mapping when suggestions closed
+                        if !self.show_suggestions {
+                            if delta.y > 0.0 { self.send_bytes(b"\x1b[A"); }
+                            if delta.y < 0.0 { self.send_bytes(b"\x1b[B"); }
                         }
                     }
                     _ => {}

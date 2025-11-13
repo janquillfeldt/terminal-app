@@ -42,16 +42,16 @@
 - [x] Shortcuts in Tooltips anzeigen
 
 ### 📜 Terminal-Scrollback verbessern
-- [ ] PageUp/PageDown Support
-- [ ] Mousewheel-Scrolling optimieren
-- [ ] Jump-to-Top / Jump-to-Bottom Buttons
+- [x] PageUp/PageDown Support
+- [x] Mousewheel-Scrolling optimieren (Grundfunktion via Pfeile)
+- [x] Jump-to-Top / Jump-to-Bottom Buttons
 - [x] Scrollback-Limit konfigurierbar (100-10000 Zeilen)
 
 ### 🔄 Tab-Management
-- [ ] Drag & Drop zum Umordnen
+- [x] Drag & Drop zum Umordnen
 - [x] Tab-Close-Buttons (× neben Namen)
-- [ ] Ctrl+Click für schnelles Schließen
-- [ ] Tab-Übersicht bei vielen offenen Tabs (Dropdown)
+- [x] Ctrl+Click für schnelles Schließen
+- [x] Tab-Übersicht bei vielen offenen Tabs (Dropdown)
 
 ---
 
