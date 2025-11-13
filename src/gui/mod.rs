@@ -591,27 +591,11 @@ impl App for GuiApp {
         self.current_theme.apply(ctx);
         ctx.set_pixels_per_point(self.font_scale);
 
-        // Apply global font mode
-        match &self.font_mode {
-            FontMode::Default => {
-                // Reset to default fonts once per frame (cheap)
-                let defs = egui::FontDefinitions::default();
-                ctx.set_fonts(defs);
-            }
-            FontMode::MonospaceEverywhere => {
-                let mut defs = egui::FontDefinitions::default();
-                if let Some(mono) = defs.families.get(&egui::FontFamily::Monospace).cloned() {
-                    defs.families.insert(egui::FontFamily::Proportional, mono);
-                }
-                ctx.set_fonts(defs);
-            }
-            FontMode::Custom(_) => {
-                if let Some(info) = &self.custom_font_info {
-                    // Keep previously loaded custom font active; nothing to do here.
-                    // If user cleared custom font, font_mode will be changed back to Default.
-                    let _ = info; // silence warning
-                }
-            }
+        // Avoid per-frame font reconfiguration for performance.
+        // Fonts are applied in apply_settings() and when changed via the Settings UI.
+        if let FontMode::Custom(info) = &self.font_mode {
+            // Keep a reference to silence warnings; no per-frame font ops.
+            let _ = info;
         }
 
         egui::TopBottomPanel::top("top").show(ctx, |ui| {
@@ -1707,8 +1691,10 @@ impl TerminalView {
 
     fn ui(&mut self, ui: &mut egui::Ui) {
         // Drain incoming bytes and update VT parser
+        let mut processed_bytes = false;
         for chunk in self.rx.try_iter() { 
             self.parser.process(&chunk); 
+            processed_bytes = true;
         }
 
         // Handle cursor blinking
@@ -1723,8 +1709,12 @@ impl TerminalView {
             self.cursor_visible = true;
         }
 
-        // Request repaint to show updates
-        ui.ctx().request_repaint();
+        // Repaint policy: only repaint on new data or cursor blink to reduce CPU
+        if processed_bytes {
+            ui.ctx().request_repaint();
+        } else if self.cursor_blinking {
+            ui.ctx().request_repaint_after(std::time::Duration::from_millis(500));
+        }
 
         // Create a visually distinct terminal frame
         let frame = egui::Frame::default()
@@ -1769,52 +1759,76 @@ impl TerminalView {
 
                 for row in 0..rows {
                     let mut job = LayoutJob::default();
+                    // Run-length encode same styled cells to reduce allocations
+                    let mut run_text = String::with_capacity(cols);
+                    let mut run_fg: egui::Color32 = self.text_color;
+                    let mut run_bg: Option<egui::Color32> = None;
+                    let mut run_active = false;
+
+                    let flush_run = |job: &mut LayoutJob,
+                                         font_id: &egui::FontId,
+                                         text: &mut String,
+                                         fg: egui::Color32,
+                                         bg: Option<egui::Color32>,
+                                         active: &mut bool| {
+                        if !text.is_empty() {
+                            let mut format = egui::TextFormat { font_id: font_id.clone(), color: fg, ..Default::default() };
+                            #[allow(deprecated)]
+                            if let Some(bgc) = bg { format.background = bgc; }
+                            job.append(text, 0.0, format);
+                            text.clear();
+                            *active = false;
+                        }
+                    };
+
                     for col in 0..cols {
                         // Fetch cell; fallback to space if out of bounds/missing
                         let mut ch: char = ' ';
                         let mut fg = self.text_color;
                         let mut bg: Option<egui::Color32> = None;
                         let mut inverse = false;
-                        // vt100 cell API (try common method names; compile will guide adjustments)
                         if let Some(cell) = screen.cell(row as u16, col as u16) {
-                            // character
                             let s = cell.contents();
                             ch = s.chars().next().unwrap_or(' ');
-                            // colors (always provided as a Color; Default means fallback)
-                            let c_fg = cell.fgcolor();
-                            fg = vt_color_to_egui(c_fg, self.text_color);
-                            let c_bg = cell.bgcolor();
-                            let bg_c = vt_color_to_egui(c_bg, egui::Color32::TRANSPARENT);
+                            fg = vt_color_to_egui(cell.fgcolor(), self.text_color);
+                            let bg_c = vt_color_to_egui(cell.bgcolor(), egui::Color32::TRANSPARENT);
                             if bg_c != egui::Color32::TRANSPARENT { bg = Some(bg_c); }
-                            // attributes
                             if cell.inverse() { inverse = true; }
                         }
 
-                        // Integrate cursor rendering by replacing the cell at cursor position
+                        // Cursor rendering
                         let is_cursor_cell = self.cursor_visible && (row as u16 == cursor_row) && (col as u16 == display_col);
-                        let (text, txt_fg, txt_bg) = if is_cursor_cell {
-                            // Draw cursor with chosen shape/color, ignoring underlying bg
+                        if is_cursor_cell {
+                            // Flush any pending run before drawing cursor glyph
+                            flush_run(&mut job, &font_id, &mut run_text, run_fg, run_bg, &mut run_active);
                             let rendered = self.cursor_shape.render(ch);
-                            (rendered, self.cursor_color, None)
-                        } else {
-                            let mut eff_fg = fg;
-                            let mut eff_bg = bg;
-                            if inverse {
-                                std::mem::swap(&mut eff_fg, eff_bg.get_or_insert(self.text_color));
-                            }
-                            (ch.to_string(), eff_fg, eff_bg)
-                        };
-
-                        let mut format = egui::TextFormat { font_id: font_id.clone(), color: txt_fg, ..Default::default() };
-                        // Background color if present
-                        #[allow(deprecated)]
-                        {
-                            if let Some(bgc) = txt_bg {
-                                format.background = bgc;
-                            }
+                            let format = egui::TextFormat { font_id: font_id.clone(), color: self.cursor_color, ..Default::default() };
+                            job.append(&rendered, 0.0, format);
+                            continue;
                         }
-                        job.append(&text, 0.0, format);
+
+                        // Effective colors with inverse
+                        let mut eff_fg = fg;
+                        let mut eff_bg = bg;
+                        if inverse {
+                            std::mem::swap(&mut eff_fg, eff_bg.get_or_insert(self.text_color));
+                        }
+
+                        // Extend current run or flush and start new
+                        if run_active && eff_fg == run_fg && eff_bg == run_bg {
+                            run_text.push(ch);
+                        } else {
+                            // flush previous
+                            flush_run(&mut job, &font_id, &mut run_text, run_fg, run_bg, &mut run_active);
+                            // start new run
+                            run_fg = eff_fg;
+                            run_bg = eff_bg;
+                            run_text.push(ch);
+                            run_active = true;
+                        }
                     }
+                    // flush last run for the row
+                    flush_run(&mut job, &font_id, &mut run_text, run_fg, run_bg, &mut run_active);
                     ui.label(job);
                 }
             });

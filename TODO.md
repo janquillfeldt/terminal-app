@@ -95,6 +95,9 @@
 
 ### ⚡ Performance
 - [ ] Rendering bei großen Outputs optimieren
+	- [x] Repaint-Throttling (nur bei neuen Daten oder Cursor-Blink)
+	- [x] Run-Length-Rendering je Zeile (weniger Allokationen/Append-Aufrufe)
+	- [x] Per-Frame Font-Rekonfiguration entfernt (nur bei Settings-Änderungen)
 - [ ] Virtuelle Scrolling für 10.000+ Zeilen
 - [ ] Frame-Rate bei inaktiven Tabs reduzieren
 
