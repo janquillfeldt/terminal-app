@@ -116,3 +116,16 @@ pub fn save_settings(settings: &AppSettings) {
         let _ = fs::write(path, content);
     }
 }
+
+pub fn export_settings(settings: &AppSettings, export_path: &Path) -> Result<(), String> {
+    if let Ok(content) = toml::to_string_pretty(settings) {
+        fs::write(export_path, content).map_err(|e| e.to_string())
+    } else {
+        Err("Failed to serialize settings".to_string())
+    }
+}
+
+pub fn import_settings(import_path: &Path) -> Result<AppSettings, String> {
+    let content = fs::read_to_string(import_path).map_err(|e| e.to_string())?;
+    toml::from_str::<AppSettings>(&content).map_err(|e| e.to_string())
+}

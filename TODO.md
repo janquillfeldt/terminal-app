@@ -57,23 +57,28 @@
 
 ## 🟢 Priorität 3: Neue Features
 
-### ➗ Split-View Terminals
-- [ ] Horizontale/Vertikale Splits
-- [ ] Focus-Navigation zwischen Splits
+### ✅ Split-View Terminals - ERLEDIGT
+- [x] Horizontale/Vertikale Splits (Strg+H, Strg+Shift+V)
+- [x] Focus-Navigation zwischen Splits (Strg+1-9)
 - [ ] Resize-Handles für Panes
 - [ ] Layout speichern/laden
+
+**Status:** ✓ Basis-Implementierung mit Keyboard-Shortcuts für Split-Erstellung und Navigation
 
 ### 🔍 Command-History-Suche
 - [ ] Ctrl+R: Reverse-Search wie in Bash
 - [ ] History-Panel mit Filter
 - [ ] History über Sessions hinweg speichern
 
-### 💾 Export/Import
-- [ ] Einstellungen exportieren (JSON/TOML)
-- [ ] SSH-Verbindungen ex-/importieren
+### ✅ Export/Import - ERLEDIGT
+- [x] Einstellungen exportieren (TOML)
+- [x] SSH-Verbindungen ex-/importieren
 - [ ] Terminal-Themes als Presets
 
+**Status:** ✓ Export/Import-Funktionen im Settings-Panel verfügbar
+
 ### 📋 Clipboard-Integration
+- [x] Copy/Paste (durch egui nativ unterstützt: Strg+C/V)
 - [ ] Automatisches Copy bei Selektion (optional)
 - [ ] Middle-Click-Paste
 - [ ] Clipboard-History

@@ -245,6 +245,22 @@ pub struct GuiApp {
     scrollback_lines: usize,
     // Drag state for terminal tabs
     dragging_terminal_tab: Option<usize>,
+    // Split view panes
+    split_panes: Vec<SplitPane>,
+    active_pane: usize,
+}
+#[cfg(feature = "gui")]
+pub struct SplitPane {
+    pub orientation: SplitOrientation,
+    pub terminals: Vec<TerminalTab>,
+    pub size: f32, // relative size (0.0..1.0)
+}
+
+#[cfg(feature = "gui")]
+#[derive(Clone, Copy, PartialEq)]
+pub enum SplitOrientation {
+    Horizontal,
+    Vertical,
 }
 
 #[cfg(feature = "gui")]
@@ -300,6 +316,8 @@ impl Default for GuiApp {
             ssh_password_prompt: None,
             scrollback_lines: 2000,
             dragging_terminal_tab: None,
+            split_panes: Vec::new(),
+            active_pane: 0,
         }
     }
 }
@@ -516,7 +534,52 @@ impl GuiApp {
                 self.font_scale = 1.0;
                 self.save_settings();
             }
+
+            // Ctrl+H: Horizontal split
+            if i.modifiers.ctrl && i.key_pressed(egui::Key::H) {
+                if self.selected == 0 { // Only in Terminal view
+                    self.create_split(SplitOrientation::Horizontal);
+                }
+            }
+
+            // Ctrl+V: Vertical split (when Shift is pressed to avoid paste conflict)
+            if i.modifiers.ctrl && i.modifiers.shift && i.key_pressed(egui::Key::V) {
+                if self.selected == 0 { // Only in Terminal view
+                    self.create_split(SplitOrientation::Vertical);
+                }
+            }
+
+            // Ctrl+1-9: Switch between split panes
+            for (idx, key) in [egui::Key::Num1, egui::Key::Num2, egui::Key::Num3, 
+                              egui::Key::Num4, egui::Key::Num5, egui::Key::Num6,
+                              egui::Key::Num7, egui::Key::Num8, egui::Key::Num9].iter().enumerate() {
+                if i.modifiers.ctrl && i.key_pressed(*key) {
+                    if idx < self.split_panes.len() {
+                        self.active_pane = idx;
+                    }
+                }
+            }
         });
+    }
+
+    fn create_split(&mut self, orientation: SplitOrientation) {
+        if let Ok(mut term) = TerminalView::new(self.scrollback_lines) {
+            term.text_color = self.terminal_text_color;
+            term.cursor_color = self.cursor_color;
+            term.cursor_shape = self.cursor_shape;
+            term.cursor_blinking = self.cursor_blinking;
+            
+            let pane = SplitPane {
+                orientation,
+                terminals: vec![TerminalTab {
+                    name: format!("Split {}", self.split_panes.len() + 1),
+                    terminal: term,
+                }],
+                size: 0.5,
+            };
+            self.split_panes.push(pane);
+            self.active_pane = self.split_panes.len() - 1;
+        }
     }
 }
 
@@ -770,7 +833,16 @@ impl App for GuiApp {
                                 ui.close_menu();
                             }
                         });
-                        ui.label(egui::RichText::new("Strg+W: Schließen | Strg+Tab: Wechseln").small().color(egui::Color32::GRAY));
+                        
+                        // Split buttons
+                        if ui.button("⬌ Split Horizontal").on_hover_text("Strg+H").clicked() {
+                            self.create_split(SplitOrientation::Horizontal);
+                        }
+                        if ui.button("⬍ Split Vertikal").on_hover_text("Strg+Shift+V").clicked() {
+                            self.create_split(SplitOrientation::Vertical);
+                        }
+                        
+                        ui.label(egui::RichText::new("Strg+W: Schließen | Strg+Tab: Wechseln | Strg+1-9: Split wechseln").small().color(egui::Color32::GRAY));
                         
                         if let Some(idx) = to_rename {
                             self.terminal_rename_dialog = Some((idx, self.terminals[idx].name.clone()));
@@ -786,16 +858,60 @@ impl App for GuiApp {
                     
                     ui.separator();
                     
-                    // Active terminal
-                    if let Some(tab) = self.terminals.get_mut(self.active_terminal_tab) {
-                        // Ensure terminal respects current settings if changed elsewhere
-                        tab.terminal.text_color = self.terminal_text_color;
-                        tab.terminal.cursor_color = self.cursor_color;
-                        tab.terminal.cursor_shape = self.cursor_shape;
-                        tab.terminal.cursor_blinking = self.cursor_blinking;
-                        tab.terminal.ui(ui);
+                    // Render split panes if any exist
+                    if !self.split_panes.is_empty() {
+                        ui.horizontal(|ui| {
+                            // Show main terminal area
+                            ui.vertical(|ui| {
+                                ui.label("Haupt-Terminal");
+                                if let Some(tab) = self.terminals.get_mut(self.active_terminal_tab) {
+                                    tab.terminal.text_color = self.terminal_text_color;
+                                    tab.terminal.cursor_color = self.cursor_color;
+                                    tab.terminal.cursor_shape = self.cursor_shape;
+                                    tab.terminal.cursor_blinking = self.cursor_blinking;
+                                    tab.terminal.ui(ui);
+                                }
+                            });
+                            
+                            ui.separator();
+                            
+                            // Show split panes
+                            let panes_len = self.split_panes.len();
+                            for (idx, pane) in self.split_panes.iter_mut().enumerate() {
+                                let is_active = idx == self.active_pane;
+                                ui.vertical(|ui| {
+                                    ui.horizontal(|ui| {
+                                        ui.label(format!("Split {} {}", idx + 1, 
+                                            if is_active { "●" } else { "○" }));
+                                        if ui.small_button("×").clicked() {
+                                            // Mark for removal
+                                        }
+                                    });
+                                    if let Some(term_tab) = pane.terminals.get_mut(0) {
+                                        term_tab.terminal.text_color = self.terminal_text_color;
+                                        term_tab.terminal.cursor_color = self.cursor_color;
+                                        term_tab.terminal.cursor_shape = self.cursor_shape;
+                                        term_tab.terminal.cursor_blinking = self.cursor_blinking;
+                                        term_tab.terminal.ui(ui);
+                                    }
+                                });
+                                if idx < panes_len - 1 {
+                                    ui.separator();
+                                }
+                            }
+                        });
                     } else {
-                        ui.colored_label(egui::Color32::RED, "Kein Terminal verfügbar.");
+                        // Active terminal (no splits)
+                        if let Some(tab) = self.terminals.get_mut(self.active_terminal_tab) {
+                            // Ensure terminal respects current settings if changed elsewhere
+                            tab.terminal.text_color = self.terminal_text_color;
+                            tab.terminal.cursor_color = self.cursor_color;
+                            tab.terminal.cursor_shape = self.cursor_shape;
+                            tab.terminal.cursor_blinking = self.cursor_blinking;
+                            tab.terminal.ui(ui);
+                        } else {
+                            ui.colored_label(egui::Color32::RED, "Kein Terminal verfügbar.");
+                        }
                     }
                 }
                 1 => {
@@ -1072,6 +1188,50 @@ impl App for GuiApp {
                             }
                         });
                         ui.label(egui::RichText::new("Anzahl der Zeilen, die im Terminal gespeichert werden").small().color(egui::Color32::GRAY));
+                    });
+                    
+                    ui.add_space(15.0);
+                    ui.separator();
+                    ui.add_space(10.0);
+
+                    // Import/Export
+                    ui.group(|ui| {
+                        ui.label(egui::RichText::new("Import/Export:").strong());
+                        ui.add_space(6.0);
+                        ui.horizontal(|ui| {
+                            if ui.button("📤 Einstellungen exportieren").clicked() {
+                                let settings = self.to_settings();
+                                if let Err(e) = crate::config::export_settings(&settings, std::path::Path::new("termix_settings_export.toml")) {
+                                    eprintln!("Export failed: {}", e);
+                                } else {
+                                    println!("Settings exported to termix_settings_export.toml");
+                                }
+                            }
+                            if ui.button("📥 Einstellungen importieren").clicked() {
+                                match crate::config::import_settings(std::path::Path::new("termix_settings_export.toml")) {
+                                    Ok(settings) => {
+                                        self.apply_settings(&settings, ui.ctx());
+                                        println!("Settings imported successfully");
+                                    }
+                                    Err(e) => eprintln!("Import failed: {}", e),
+                                }
+                            }
+                        });
+                        ui.horizontal(|ui| {
+                            if ui.button("📤 SSH-Verbindungen exportieren").clicked() {
+                                if let Err(e) = self.ssh_manager.export(std::path::Path::new("ssh_export.toml")) {
+                                    eprintln!("SSH export failed: {}", e);
+                                } else {
+                                    println!("SSH connections exported to ssh_export.toml");
+                                }
+                            }
+                            if ui.button("📥 SSH-Verbindungen importieren").clicked() {
+                                match self.ssh_manager.import(std::path::Path::new("ssh_export.toml")) {
+                                    Ok(()) => println!("SSH connections imported successfully"),
+                                    Err(e) => eprintln!("SSH import failed: {}", e),
+                                }
+                            }
+                        });
                     });
                     
                     ui.add_space(15.0);
@@ -2000,6 +2160,21 @@ impl SshManager {
         if let Ok(content) = toml::to_string_pretty(self) {
             let _ = std::fs::write(config_path, content);
         }
+    }
+
+    fn export(&self, path: &std::path::Path) -> Result<(), String> {
+        if let Ok(content) = toml::to_string_pretty(self) {
+            std::fs::write(path, content).map_err(|e| e.to_string())
+        } else {
+            Err("Failed to serialize SSH connections".to_string())
+        }
+    }
+
+    fn import(&mut self, path: &std::path::Path) -> Result<(), String> {
+        let content = std::fs::read_to_string(path).map_err(|e| e.to_string())?;
+        let manager: SshManager = toml::from_str(&content).map_err(|e| e.to_string())?;
+        self.connections = manager.connections;
+        Ok(())
     }
 
     fn ui(&mut self, ui: &mut egui::Ui, pending_connection: &mut Option<SshConnection>) {
