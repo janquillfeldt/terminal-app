@@ -92,6 +92,20 @@ settings:
   rust_version: "Rust Version:"
   termix_version: "TermiX Version:"
   language: "Language:"
+  screenshot_wizard: "Screenshot Wizard"
+
+# Screenshot Helper
+screenshots:
+  configure_view: "Configure View"
+  copy_filename: "Copy filename"
+  open_assets: "Open assets folder"
+  terminal_de_dark: "Terminal (DE, Dark)"
+  terminal_en_light: "Terminal (EN, Light)"
+  ssh_manager: "SSH Manager"
+  markdown_editor: "Markdown Editor"
+  settings_panel: "Settings"
+  about_view: "About"
+  exit_view: "Exit"
 
 # About View
 about:

@@ -1226,6 +1226,86 @@ impl App for GuiApp {
                     ui.separator();
                     ui.add_space(10.0);
 
+                    // Screenshot Wizard
+                    ui.group(|ui| {
+                        ui.label(egui::RichText::new(rust_i18n::t!("settings.screenshot_wizard")).strong());
+                        ui.add_space(6.0);
+
+                        // Helper closure to render one row (label, configure, copy filename)
+                        let mut row = |label: &str, configure: &mut dyn FnMut(&egui::Context), filename: &str| {
+                            ui.horizontal(|ui| {
+                                ui.label(label);
+                                if ui.button(rust_i18n::t!("screenshots.configure_view").as_ref()).clicked() {
+                                    configure(ui.ctx());
+                                }
+                                if ui.button(rust_i18n::t!("screenshots.copy_filename").as_ref()).clicked() {
+                                    ui.output_mut(|o| o.copied_text = filename.to_string());
+                                }
+                            });
+                        };
+
+                        // Terminal (DE, Dark)
+                        let mut cfg_terminal_de_dark = |ctx: &egui::Context| {
+                            self.current_language = "de".to_string();
+                            rust_i18n::set_locale("de");
+                            self.current_theme = Theme::Dark;
+                            self.current_theme.apply(ctx);
+                            self.selected = 0;
+                            self.save_settings();
+                        };
+                        row(rust_i18n::t!("screenshots.terminal_de_dark").as_ref(), &mut cfg_terminal_de_dark, "assets/terminal-de-dark.png");
+
+                        // Terminal (EN, Light)
+                        let mut cfg_terminal_en_light = |ctx: &egui::Context| {
+                            self.current_language = "en".to_string();
+                            rust_i18n::set_locale("en");
+                            self.current_theme = Theme::Light;
+                            self.current_theme.apply(ctx);
+                            self.selected = 0;
+                            self.save_settings();
+                        };
+                        row(rust_i18n::t!("screenshots.terminal_en_light").as_ref(), &mut cfg_terminal_en_light, "assets/terminal-en-light.png");
+
+                        // SSH Manager
+                        let mut cfg_ssh = |_: &egui::Context| {
+                            self.selected = 1;
+                        };
+                        row(rust_i18n::t!("screenshots.ssh_manager").as_ref(), &mut cfg_ssh, "assets/ssh-manager.png");
+
+                        // Markdown Editor
+                        let mut cfg_md = |_: &egui::Context| {
+                            self.selected = 2;
+                        };
+                        row(rust_i18n::t!("screenshots.markdown_editor").as_ref(), &mut cfg_md, "assets/markdown-editor.png");
+
+                        // Settings panel
+                        let mut cfg_settings = |_: &egui::Context| {
+                            self.selected = 3;
+                        };
+                        row(rust_i18n::t!("screenshots.settings_panel").as_ref(), &mut cfg_settings, "assets/settings-panel.png");
+
+                        // About view
+                        let mut cfg_about = |_: &egui::Context| {
+                            self.selected = 4;
+                        };
+                        row(rust_i18n::t!("screenshots.about_view").as_ref(), &mut cfg_about, "assets/about-view.png");
+
+                        // Exit view / dialog example
+                        let mut cfg_exit = |_: &egui::Context| {
+                            self.selected = 5;
+                        };
+                        row(rust_i18n::t!("screenshots.exit_view").as_ref(), &mut cfg_exit, "assets/exit-dialog.png");
+
+                        ui.add_space(6.0);
+                        if ui.button(rust_i18n::t!("screenshots.open_assets").as_ref()).clicked() {
+                            let _ = open::that("assets");
+                        }
+                    });
+
+                    ui.add_space(15.0);
+                    ui.separator();
+                    ui.add_space(10.0);
+
                     // Import/Export
                     ui.group(|ui| {
                         ui.label(egui::RichText::new("Import/Export:").strong());
