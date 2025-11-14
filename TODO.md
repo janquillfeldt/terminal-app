@@ -104,13 +104,16 @@
 - [x] Performance-Monitoring (Debug-Overlay mit FPS, Zeilen-Count, Repaint-Grund)
 
 **Status:** ✓ Performance-Optimierung abgeschlossen mit messbare Verbesserungen### ✅ README - ERLEDIGT
+**Status:** ✓ Performance-Optimierung abgeschlossen mit messbaren Verbesserungen
+### ✅ README - ERLEDIGT
 - [x] Buy Me a Coffee Link getestet (funktioniert mit HTML img tag)
 - [x] Feature-Liste erweitert mit Badges und Kategorien
 - [x] Installation-Guide erweitert (Prerequisites, Binary-Releases, Launcher)
 - [x] Usage Guide hinzugefügt mit Keyboard Shortcuts
+- [x] Screenshots-Abschnitt mit Platzhaltern und Aufnahme-Anleitung im README
 - [ ] Screenshots hinzufügen (benötigt Bildmaterial)
 
-**Status:** ✓ README komplett überarbeitet mit besserer Struktur und Dokumentation
+**Status:** ✓ README komplett überarbeitet mit besserer Struktur und Dokumentation; Screenshots-Abschnitt hinzugefügt, Bilder stehen noch aus
 
 ### 🎨 Theme-System
 - [x] Mehr vordefinierte Themes (7 Themes: Dark, Light, Dracula, Monokai, Solarized, Nord, Gruvbox)
@@ -159,4 +162,4 @@
 - UX-Features verbessern Komfort ohne neue Funktionalität
 - Bonus-Features sind "nice-to-have" für später
 
-**Letztes Update:** 13.11.2025
+**Letztes Update:** 14.11.2025
