@@ -135,6 +135,49 @@ All settings are automatically saved to:
 
 SSH connections are stored in `ssh_connections.toml` in the working directory.
 
+## 🖼️ Screenshots
+
+Below is an overview of the main application views. (Place your captured screenshots into `assets/` with the filenames shown.)
+
+| View | Description | Filename |
+|------|-------------|----------|
+| Terminal (DE, Dark Theme) | Multi-tab terminal with split panes | `assets/terminal-de-dark.png` |
+| Terminal (EN, Light Theme) | Alternate language + theme | `assets/terminal-en-light.png` |
+| SSH Manager | Saved connections and connect dialog | `assets/ssh-manager.png` |
+| Markdown Editor | Editor with live preview and multiple tabs | `assets/markdown-editor.png` |
+| Settings | Themes, fonts, cursor, language switch | `assets/settings-panel.png` |
+| About | Feature & technology overview | `assets/about-view.png` |
+| Exit / Dialog Example | Exit panel or rename dialog | `assets/exit-dialog.png` |
+
+### How to Capture
+Use your OS screenshot tools while the GUI is running:
+
+Linux (Wayland):
+```bash
+grim -g "$(slurp)" assets/terminal-de-dark.png
+```
+Linux (X11):
+```bash
+import -window root assets/terminal-de-dark.png  # from ImageMagick
+```
+Generic (desktop keybindings):
+- Print Screen → Full screen (then save/crop)
+- Shift+Print → Area selection (GNOME/KDE)
+
+Inside the app:
+1. Switch language: Settings → Language (🇩🇪 / 🇬🇧)
+2. Change theme: Settings → Theme list (pick Dark/Light/Dracula/etc.)
+3. Open required view from sidebar (Terminal/SSH/Markdown/Settings/About/Exit)
+4. Arrange splits (Ctrl+H / Ctrl+Shift+V) for terminal screenshot.
+5. For dialog screenshot: rename a tab (✏) or open Exit view.
+
+Once files are added, the above table will render them. Example embedding:
+```markdown
+![Terminal Dark DE](assets/terminal-de-dark.png)
+```
+
+> Optional: add more variants (e.g. Dracula theme, Nord theme) using similar filenames.
+
 ## 🤝 Contributing
 
 Contributions are welcome! Here's how you can help:
