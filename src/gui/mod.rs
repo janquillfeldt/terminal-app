@@ -1462,6 +1462,11 @@ struct TerminalView {
     last_paint_time: f64,
     // Cache of plain text lines (including scrollback) for fast virtualized rendering
     cached_plain_lines: Vec<String>,
+    // Performance metrics (debug build only)
+    #[cfg(debug_assertions)]
+    frame_times: std::collections::VecDeque<f64>,
+    #[cfg(debug_assertions)]
+    last_repaint_reason: String,
 }
 
 // Common shell commands for suggestions
@@ -1556,6 +1561,10 @@ impl TerminalView {
             last_blink_time: 0.0,
             last_paint_time: 0.0,
             cached_plain_lines: Vec::new(),
+            #[cfg(debug_assertions)]
+            frame_times: std::collections::VecDeque::new(),
+            #[cfg(debug_assertions)]
+            last_repaint_reason: String::new(),
         })
     }
 
@@ -1659,6 +1668,10 @@ impl TerminalView {
             last_blink_time: 0.0,
             last_paint_time: 0.0,
             cached_plain_lines: Vec::new(),
+            #[cfg(debug_assertions)]
+            frame_times: std::collections::VecDeque::new(),
+            #[cfg(debug_assertions)]
+            last_repaint_reason: String::new(),
         })
     }
 
@@ -1698,6 +1711,9 @@ impl TerminalView {
     }
 
     fn ui_with_activity(&mut self, ui: &mut egui::Ui, active: bool) {
+        #[cfg(debug_assertions)]
+        let frame_start = ui.input(|i| i.time);
+        
         // Drain incoming bytes and update VT parser
         let mut processed_bytes = false;
         for chunk in self.rx.try_iter() { 
@@ -1711,6 +1727,10 @@ impl TerminalView {
             // Limit memory spikes by reserving approximately current size
             self.cached_plain_lines.clear();
             self.cached_plain_lines.extend(full.lines().map(|s| s.to_string()));
+            #[cfg(debug_assertions)]
+            {
+                self.last_repaint_reason = "new data".to_string();
+            }
         }
 
         // Handle cursor blinking
@@ -1731,15 +1751,32 @@ impl TerminalView {
         if processed_bytes {
             if active {
                 ui.ctx().request_repaint();
+                #[cfg(debug_assertions)]
+                if self.last_repaint_reason.is_empty() {
+                    self.last_repaint_reason = "new data (active)".to_string();
+                }
             } else {
                 // Throttle: if last paint was <100ms ago, schedule next repaint after the remainder.
                 let dt = now - self.last_paint_time;
                 if dt >= 0.1 {
                     ui.ctx().request_repaint();
+                    #[cfg(debug_assertions)]
+                    {
+                        self.last_repaint_reason = "new data (throttled)".to_string();
+                    }
                 } else {
                     let wait = ((0.1 - dt).max(0.0) * 1000.0) as u64;
                     ui.ctx().request_repaint_after(std::time::Duration::from_millis(wait));
+                    #[cfg(debug_assertions)]
+                    {
+                        self.last_repaint_reason = format!("throttle wait {}ms", wait);
+                    }
                 }
+            }
+        } else if self.cursor_blinking && active {
+            #[cfg(debug_assertions)]
+            {
+                self.last_repaint_reason = "cursor blink".to_string();
             }
         }
 
@@ -1980,8 +2017,35 @@ impl TerminalView {
             ui.colored_label(egui::Color32::GREEN, "⌨️ Terminal aktiv - Befehle werden direkt verarbeitet (Tab für Vorschläge)");
         }
         }); // Close frame
+        
         // Mark paint time for throttling
         self.last_paint_time = ui.input(|i| i.time);
+        
+        // Debug overlay (only in debug builds)
+        #[cfg(debug_assertions)]
+        {
+            let frame_end = ui.input(|i| i.time);
+            let frame_time = frame_end - frame_start;
+            self.frame_times.push_back(frame_time);
+            if self.frame_times.len() > 60 {
+                self.frame_times.pop_front();
+            }
+            let avg_frame_time = if self.frame_times.is_empty() {
+                0.0
+            } else {
+                self.frame_times.iter().sum::<f64>() / self.frame_times.len() as f64
+            };
+            let fps = if avg_frame_time > 0.0 { 1.0 / avg_frame_time } else { 0.0 };
+            
+            ui.separator();
+            ui.horizontal(|ui| {
+                ui.colored_label(egui::Color32::LIGHT_BLUE, format!("🔍 FPS: {:.1}", fps));
+                ui.separator();
+                ui.colored_label(egui::Color32::LIGHT_BLUE, format!("Lines: {} (cached) | {} rows", self.cached_plain_lines.len(), self.rows));
+                ui.separator();
+                ui.colored_label(egui::Color32::LIGHT_BLUE, format!("Repaint: {}", self.last_repaint_reason));
+            });
+        }
     }
 
     // (intentionally no simple wrapper to avoid unused warnings)

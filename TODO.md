@@ -94,15 +94,16 @@
 **Status:** ✓ Alle Clippy-Warnings behoben mit automatischen Fixes und manuellen Anpassungen
 
 ### ⚡ Performance
-- [ ] Rendering bei großen Outputs optimieren
-	- [x] Repaint-Throttling (nur bei neuen Daten oder Cursor-Blink)
-	- [x] Run-Length-Rendering je Zeile (weniger Allokationen/Append-Aufrufe)
-	- [x] Per-Frame Font-Rekonfiguration entfernt (nur bei Settings-Änderungen)
-	- [x] Vertikal virtualisiertes Rendering (nur sichtbare Zeilen rendern)
+- [x] Rendering bei großen Outputs optimieren
+  - [x] Repaint-Throttling (nur bei neuen Daten oder Cursor-Blink)
+  - [x] Run-Length-Rendering je Zeile (weniger Allokationen/Append-Aufrufe)
+  - [x] Per-Frame Font-Rekonfiguration entfernt (nur bei Settings-Änderungen)
+  - [x] Vertikal virtualisiertes Rendering (nur sichtbare Zeilen rendern)
 - [x] Virtuelle Scrolling für 10.000+ Zeilen (Plaintext im Scrollback, farbig im aktuellen Screen)
 - [x] Frame-Rate bei inaktiven Splits drosseln (≈10 FPS bei starkem Output)
+- [x] Performance-Monitoring (Debug-Overlay mit FPS, Zeilen-Count, Repaint-Grund)
 
-### ✅ README - ERLEDIGT
+**Status:** ✓ Performance-Optimierung abgeschlossen mit messbare Verbesserungen### ✅ README - ERLEDIGT
 - [x] Buy Me a Coffee Link getestet (funktioniert mit HTML img tag)
 - [x] Feature-Liste erweitert mit Badges und Kategorien
 - [x] Installation-Guide erweitert (Prerequisites, Binary-Releases, Launcher)
