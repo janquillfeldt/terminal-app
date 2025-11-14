@@ -248,6 +248,8 @@ pub struct GuiApp {
     // Split view panes
     split_panes: Vec<SplitPane>,
     active_pane: usize,
+    // Language preference
+    current_language: String,
 }
 #[cfg(feature = "gui")]
 #[allow(private_interfaces)]
@@ -320,6 +322,7 @@ impl Default for GuiApp {
             dragging_terminal_tab: None,
             split_panes: Vec::new(),
             active_pane: 0,
+            current_language: "de".to_string(),
         }
     }
 }
@@ -397,6 +400,10 @@ impl GuiApp {
 
         // Terminal settings
         self.scrollback_lines = settings.scrollback_lines.clamp(100, 100000);
+        
+        // Language
+        self.current_language = settings.language.clone();
+        rust_i18n::set_locale(&self.current_language);
 
         // Propagate to existing terminals
         for t in &mut self.terminals {
@@ -421,6 +428,7 @@ impl GuiApp {
             custom_font_path: self.custom_font_info.clone(),
             sidebar_collapsed: self.sidebar_collapsed,
             scrollback_lines: self.scrollback_lines,
+            language: self.current_language.clone(),
         }
     }
 
@@ -1171,6 +1179,31 @@ impl App for GuiApp {
                         ui.label(egui::RichText::new("Anzahl der Zeilen, die im Terminal gespeichert werden").small().color(egui::Color32::GRAY));
                     });
                     
+                    ui.add_space(15.0);
+                    ui.separator();
+                    ui.add_space(10.0);
+                    
+                    // Language selection
+                    ui.group(|ui| {
+                        ui.label(egui::RichText::new(rust_i18n::t!("settings.language")).strong());
+                        ui.add_space(6.0);
+                        ui.horizontal(|ui| {
+                            let mut changed = false;
+                            if ui.selectable_label(self.current_language == "de", "🇩🇪 Deutsch").clicked() {
+                                self.current_language = "de".to_string();
+                                changed = true;
+                            }
+                            if ui.selectable_label(self.current_language == "en", "🇬🇧 English").clicked() {
+                                self.current_language = "en".to_string();
+                                changed = true;
+                            }
+                            if changed {
+                                rust_i18n::set_locale(&self.current_language);
+                                self.save_settings();
+                            }
+                        });
+                    });
+
                     ui.add_space(15.0);
                     ui.separator();
                     ui.add_space(10.0);

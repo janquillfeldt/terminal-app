@@ -1,0 +1,172 @@
+# English Translations for TermiX
+_version: 1
+
+# Main Menu
+menu:
+  terminal: "Terminal"
+  ssh: "SSH"
+  markdown: "Markdown"
+  settings: "Settings"
+  about: "About"
+  exit: "Exit"
+
+# Terminal View
+terminal:
+  title: "Terminal"
+  new: "New Terminal"
+  tabs: "Tabs"
+  close_all_but_active: "Close all except current"
+  split_horizontal: "Split Horizontal"
+  split_vertical: "Split Vertical"
+  rename: "Rename"
+  close: "Close"
+  main_terminal: "Main Terminal"
+  split: "Split"
+  active: "active"
+  no_terminal: "No terminal available."
+  shortcuts_info: "Ctrl+W: Close | Ctrl+Tab: Switch | Ctrl+1-9: Switch split"
+  terminal_active: "Terminal active - Commands processed directly (Tab for suggestions)"
+  suggestions: "Suggestions:"
+  suggestions_help: "(Tab = Complete, ↑↓ = Select, Esc = Close)"
+
+# SSH View
+ssh:
+  title: "SSH Connections"
+  new_connection: "New SSH Connection"
+  save: "Save"
+  saved_connections: "Saved Connections:"
+  no_connections: "No SSH connections saved. Click 'New SSH Connection' to add one."
+  connect: "Connect"
+  rename: "Rename"
+  delete: "Delete"
+  name: "Name:"
+  host: "Host:"
+  port: "Port:"
+  username: "Username:"
+  password: "Password:"
+  add: "Add"
+  cancel: "Cancel"
+  password_required: "SSH Password Required"
+  connect_to: "Connecting to:"
+
+# Markdown View
+markdown:
+  title: "Markdown Editor"
+  new_document: "New Document"
+  close: "Close"
+  rename: "Rename"
+  open: "Open"
+  save: "Save"
+  new: "New"
+  unsaved: "Unsaved"
+  preview: "Preview"
+  editor: "Editor"
+  shortcuts_info: "Ctrl+W: Close | Ctrl+Tab: Switch"
+
+# Settings View
+settings:
+  title: "Settings"
+  theme: "Theme:"
+  theme_preview: "Theme Preview:"
+  colors_per_view: "Colors per view:"
+  terminal_text_color: "Terminal Text Color:"
+  markdown_text_color: "Markdown Text Color:"
+  ssh_text_color: "SSH Text Color:"
+  cursor_color: "Cursor Color:"
+  cursor_settings: "Cursor Settings:"
+  cursor_shape: "Cursor Shape:"
+  cursor_blink: "Cursor Blinking"
+  font_settings: "Font (global):"
+  font_scale: "Font Size:"
+  shortcuts_zoom: "Ctrl+Plus/Minus: Zoom | Ctrl+0: Reset"
+  terminal_settings: "Terminal Settings:"
+  scrollback_lines: "Scrollback Lines:"
+  scrollback_help: "Number of lines stored in terminal history"
+  import_export: "Import/Export:"
+  export_settings: "Export Settings"
+  import_settings: "Import Settings"
+  export_ssh: "Export SSH Connections"
+  import_ssh: "Import SSH Connections"
+  system_info: "System Information:"
+  platform: "Platform:"
+  rust_version: "Rust Version:"
+  termix_version: "TermiX Version:"
+  language: "Language:"
+
+# About View
+about:
+  title: "About TermiX"
+  subtitle: "Modern Terminal Application"
+  version: "Version"
+  features: "Features:"
+  feature_1: "Multi-Tab Terminal & Markdown Editor"
+  feature_2: "Smart Command Suggestions (50+ commands)"
+  feature_3: "SSH Connection Manager"
+  feature_4: "Cross-Platform (Linux & Windows)"
+  feature_5: "Dual Interface (TUI & GUI)"
+  technology: "Technology:"
+  tech_1: "TUI: Crossterm"
+  tech_2: "GUI: egui/eframe"
+  tech_3: "Terminal: portable-pty + vt100"
+  tech_4: "SSH: ssh2"
+  tech_5: "Markdown: pulldown-cmark"
+  support: "Support:"
+  support_text: "If you find TermiX useful, support development:"
+  buy_coffee: "Buy me a coffee"
+  buy_coffee_hint: "Opens buymeacoffee.com/janquillfeldt"
+
+# Exit View
+exit:
+  title: "Exit"
+  message: "Closes the application."
+  close_window: "Close Window"
+
+# Dialogs
+dialogs:
+  rename_terminal: "Rename Terminal"
+  rename_markdown: "Rename Markdown Document"
+  new_name: "New Name:"
+  save: "Save"
+  cancel: "Cancel"
+
+# Common
+common:
+  active: "active"
+  close: "Close"
+  save: "Save"
+  cancel: "Cancel"
+  rename: "Rename"
+  delete: "Delete"
+
+# Sidebar
+sidebar:
+  menu: "Main Menu"
+  collapse_hint: "Click to collapse"
+
+# Theme Descriptions
+themes:
+  dark: "Standard dark theme with neutral colors"
+  light: "Light theme for better readability in daylight"
+  dracula: "Popular dark theme with purple accents"
+  monokai: "Classic developer theme with warm colors"
+  solarized: "Scientifically optimized dark theme"
+  nord: "Arctic-inspired theme with cool tones"
+  gruvbox: "Retro-inspired warm dark theme"
+
+# Font Modes
+fonts:
+  default: "Default"
+  monospace_everywhere: "Monospace Everywhere"
+  custom: "Custom"
+  load_font: "Load Font (.ttf/.otf)"
+  active: "Active:"
+  reset: "Reset"
+
+# Cursor Shapes
+cursor_shapes:
+  block: "Block █"
+  underline: "Underline _"
+  vertical_bar: "Vertical Bar |"
+  double_underscore: "Double Underscore ‗"
+  box: "Box ▯"
+  cross: "Cross ╳"

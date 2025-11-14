@@ -10,6 +10,7 @@ serde = { version = "1.0", features = ["derive"] }  # For serialization and dese
 toml = "0.5"  # For configuration file handling
 anyhow = "1"
 open = "5.0"  # For opening URLs in browser
+rust-i18n = "3"  # Internationalization support
 
 [features]
 # Default to terminal UI only; GUI can be enabled with `--features gui`

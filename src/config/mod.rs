@@ -35,6 +35,9 @@ pub struct AppSettings {
 
     // Terminal settings
     pub scrollback_lines: usize,  // Default: 2000
+    
+    // Language
+    pub language: String,  // "de" or "en"
 }
 
 impl Default for AppSettings {
@@ -52,6 +55,7 @@ impl Default for AppSettings {
             custom_font_path: None,
             sidebar_collapsed: false,
             scrollback_lines: 2000,
+            language: "de".into(),  // Default to German
         }
     }
 }

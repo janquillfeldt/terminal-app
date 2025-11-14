@@ -1,0 +1,172 @@
+# Deutsche Übersetzungen für TermiX
+_version: 1
+
+# Hauptmenü
+menu:
+  terminal: "Terminal"
+  ssh: "SSH"
+  markdown: "Markdown"
+  settings: "Einstellungen"
+  about: "Über"
+  exit: "Beenden"
+
+# Terminal View
+terminal:
+  title: "Terminal"
+  new: "Neues Terminal"
+  tabs: "Tabs"
+  close_all_but_active: "Alle schließen außer aktuellem"
+  split_horizontal: "Split Horizontal"
+  split_vertical: "Split Vertikal"
+  rename: "Umbenennen"
+  close: "Schließen"
+  main_terminal: "Haupt-Terminal"
+  split: "Split"
+  active: "aktiv"
+  no_terminal: "Kein Terminal verfügbar."
+  shortcuts_info: "Strg+W: Schließen | Strg+Tab: Wechseln | Strg+1-9: Split wechseln"
+  terminal_active: "Terminal aktiv - Befehle werden direkt verarbeitet (Tab für Vorschläge)"
+  suggestions: "Vorschläge:"
+  suggestions_help: "(Tab = Vervollständigen, ↑↓ = Auswählen, Esc = Schließen)"
+
+# SSH View
+ssh:
+  title: "SSH Verbindungen"
+  new_connection: "Neue SSH Verbindung"
+  save: "Speichern"
+  saved_connections: "Gespeicherte Verbindungen:"
+  no_connections: "Keine SSH Verbindungen gespeichert. Klicke auf 'Neue SSH Verbindung' um eine hinzuzufügen."
+  connect: "Verbinden"
+  rename: "Umbenennen"
+  delete: "Löschen"
+  name: "Name:"
+  host: "Host:"
+  port: "Port:"
+  username: "Benutzer:"
+  password: "Passwort:"
+  add: "Hinzufügen"
+  cancel: "Abbrechen"
+  password_required: "SSH Passwort erforderlich"
+  connect_to: "Verbindung zu:"
+
+# Markdown View
+markdown:
+  title: "Markdown Editor"
+  new_document: "Neues Dokument"
+  close: "Schließen"
+  rename: "Umbenennen"
+  open: "Öffnen"
+  save: "Speichern"
+  new: "Neu"
+  unsaved: "Ungespeichert"
+  preview: "Vorschau"
+  editor: "Editor"
+  shortcuts_info: "Strg+W: Schließen | Strg+Tab: Wechseln"
+
+# Settings View
+settings:
+  title: "Einstellungen"
+  theme: "Theme:"
+  theme_preview: "Theme Vorschau:"
+  colors_per_view: "Farben pro Bereich:"
+  terminal_text_color: "Terminal Textfarbe:"
+  markdown_text_color: "Markdown Textfarbe:"
+  ssh_text_color: "SSH Textfarbe:"
+  cursor_color: "Cursor Farbe:"
+  cursor_settings: "Cursor Einstellungen:"
+  cursor_shape: "Cursor Form:"
+  cursor_blink: "Cursor blinken"
+  font_settings: "Schriftart (global):"
+  font_scale: "Schriftgröße:"
+  shortcuts_zoom: "Strg+Plus/Minus: Zoom | Strg+0: Reset"
+  terminal_settings: "Terminal Einstellungen:"
+  scrollback_lines: "Scrollback-Zeilen:"
+  scrollback_help: "Anzahl der Zeilen, die im Terminal gespeichert werden"
+  import_export: "Import/Export:"
+  export_settings: "Einstellungen exportieren"
+  import_settings: "Einstellungen importieren"
+  export_ssh: "SSH-Verbindungen exportieren"
+  import_ssh: "SSH-Verbindungen importieren"
+  system_info: "System-Information:"
+  platform: "Plattform:"
+  rust_version: "Rust Version:"
+  termix_version: "TermiX Version:"
+  language: "Sprache:"
+
+# About View
+about:
+  title: "Über TermiX"
+  subtitle: "Modern Terminal Application"
+  version: "Version"
+  features: "Features:"
+  feature_1: "Multi-Tab Terminal & Markdown Editor"
+  feature_2: "Smart Command Suggestions (50+ Befehle)"
+  feature_3: "SSH Connection Manager"
+  feature_4: "Cross-Platform (Linux & Windows)"
+  feature_5: "Dual Interface (TUI & GUI)"
+  technology: "Technologie:"
+  tech_1: "TUI: Crossterm"
+  tech_2: "GUI: egui/eframe"
+  tech_3: "Terminal: portable-pty + vt100"
+  tech_4: "SSH: ssh2"
+  tech_5: "Markdown: pulldown-cmark"
+  support: "Support:"
+  support_text: "Wenn du TermiX nützlich findest, unterstütze die Entwicklung:"
+  buy_coffee: "Buy me a coffee"
+  buy_coffee_hint: "Öffnet buymeacoffee.com/janquillfeldt"
+
+# Exit View
+exit:
+  title: "Beenden"
+  message: "Schließt das Programm."
+  close_window: "Fenster schließen"
+
+# Dialogs
+dialogs:
+  rename_terminal: "Terminal umbenennen"
+  rename_markdown: "Markdown-Dokument umbenennen"
+  new_name: "Neuer Name:"
+  save: "Speichern"
+  cancel: "Abbrechen"
+
+# Common
+common:
+  active: "aktiv"
+  close: "Schließen"
+  save: "Speichern"
+  cancel: "Abbrechen"
+  rename: "Umbenennen"
+  delete: "Löschen"
+
+# Sidebar
+sidebar:
+  menu: "Hauptmenü"
+  collapse_hint: "Klicke zum Einklappen"
+
+# Theme Descriptions
+themes:
+  dark: "Standard dunkles Theme mit neutralen Farben"
+  light: "Helles Theme für bessere Lesbarkeit bei Tageslicht"
+  dracula: "Beliebtes dunkles Theme mit lila Akzenten"
+  monokai: "Klassisches Entwickler-Theme mit warmen Farben"
+  solarized: "Wissenschaftlich optimiertes dunkles Theme"
+  nord: "Arktisch inspiriertes Theme mit kalten Farbtönen"
+  gruvbox: "Retro-inspiriertes warmes dunkles Theme"
+
+# Font Modes
+fonts:
+  default: "Standard"
+  monospace_everywhere: "Monospace überall"
+  custom: "Benutzerdefiniert"
+  load_font: "Schrift laden (.ttf/.otf)"
+  active: "Aktiv:"
+  reset: "Zurücksetzen"
+
+# Cursor Shapes
+cursor_shapes:
+  block: "Block █"
+  underline: "Unterstrich _"
+  vertical_bar: "Strich |"
+  double_underscore: "Doppelunterstrich ‗"
+  box: "Kasten ▯"
+  cross: "Kreuz ╳"

@@ -126,13 +126,21 @@
 - [ ] Minimize to Tray
 - [ ] Quick-Actions im Tray-Menü
 
+**Status:** Benötigt GTK-Dependencies auf Linux; nicht kritisch für Kern-Funktionalität
+
 ### 🧩 Plugin-System
 - [ ] API für externe Plugins
 - [ ] Beispiel-Plugins (z.B. Git-Integration)
 
-### 🌐 Sprach-Support
-- [ ] i18n-Framework integrieren
-- [ ] Deutsch/Englisch umschaltbar
+**Status:** Geplant für zukünftige Releases; würde WASM oder dynamisches Laden benötigen
+
+### ✅ 🌐 Sprach-Support - ERLEDIGT
+- [x] i18n-Framework integrieren (rust-i18n)
+- [x] Deutsch/Englisch umschaltbar
+- [x] Sprach-Selector im Settings-Panel
+- [x] Vollständige Übersetzungen für DE/EN
+
+**Status:** ✓ Implementiert mit rust-i18n, Sprache wählbar im Settings-Panel
 
 ---
 

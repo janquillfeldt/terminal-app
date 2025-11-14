@@ -3,6 +3,9 @@ mod gui;
 mod config;
 mod ui;
 
+// Initialize i18n support
+rust_i18n::i18n!("locales");
+
 use ui::UI; // Immer verfügbar, auch wenn im GUI-Build nur als Fallback genutzt
 
 #[cfg(feature = "gui")]
