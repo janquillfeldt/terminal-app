@@ -99,7 +99,7 @@
 	- [x] Run-Length-Rendering je Zeile (weniger Allokationen/Append-Aufrufe)
 	- [x] Per-Frame Font-Rekonfiguration entfernt (nur bei Settings-Änderungen)
 	- [x] Vertikal virtualisiertes Rendering (nur sichtbare Zeilen rendern)
-- [ ] Virtuelle Scrolling für 10.000+ Zeilen
+- [x] Virtuelle Scrolling für 10.000+ Zeilen (Plaintext im Scrollback, farbig im aktuellen Screen)
 - [x] Frame-Rate bei inaktiven Splits drosseln (≈10 FPS bei starkem Output)
 
 ### ✅ README - ERLEDIGT

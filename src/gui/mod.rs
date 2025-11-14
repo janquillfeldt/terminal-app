@@ -1460,6 +1460,8 @@ struct TerminalView {
     cursor_visible: bool, // for blink state
     last_blink_time: f64,
     last_paint_time: f64,
+    // Cache of plain text lines (including scrollback) for fast virtualized rendering
+    cached_plain_lines: Vec<String>,
 }
 
 // Common shell commands for suggestions
@@ -1553,6 +1555,7 @@ impl TerminalView {
             cursor_visible: true,
             last_blink_time: 0.0,
             last_paint_time: 0.0,
+            cached_plain_lines: Vec::new(),
         })
     }
 
@@ -1655,6 +1658,7 @@ impl TerminalView {
             cursor_visible: true,
             last_blink_time: 0.0,
             last_paint_time: 0.0,
+            cached_plain_lines: Vec::new(),
         })
     }
 
@@ -1699,6 +1703,14 @@ impl TerminalView {
         for chunk in self.rx.try_iter() { 
             self.parser.process(&chunk); 
             processed_bytes = true;
+        }
+        if processed_bytes {
+            // Update cached plain-text lines (includes scrollback + current screen)
+            let screen = self.parser.screen();
+            let full = screen.contents();
+            // Limit memory spikes by reserving approximately current size
+            self.cached_plain_lines.clear();
+            self.cached_plain_lines.extend(full.lines().map(|s| s.to_string()));
         }
 
         // Handle cursor blinking
@@ -1769,11 +1781,22 @@ impl TerminalView {
             let cols = self.cols as usize;
             let font_id = egui::TextStyle::Monospace.resolve(ui.style());
             let row_height = char_h.max(1.0);
+            // Total rows including scrollback based on cached plain lines
+            let total_rows = self.cached_plain_lines.len().max(rows);
+            // Boundary index where current screen starts in the absolute buffer
+            let boundary = total_rows.saturating_sub(rows);
 
             egui::ScrollArea::vertical()
                 .auto_shrink([false, false])
-                .show_rows(ui, row_height, rows, |ui, row_range| {
+                .show_rows(ui, row_height, total_rows, |ui, row_range| {
                     for row in row_range {
+                        // Render scrolled-back history as plain text
+                        if row < boundary {
+                            let line = self.cached_plain_lines.get(row).map(|s| s.as_str()).unwrap_or("");
+                            ui.label(egui::RichText::new(line).monospace().color(self.text_color));
+                            continue;
+                        }
+                        let row = row - boundary; // screen row index (0..rows-1)
                         let mut job = LayoutJob::default();
                         // Run-length encode same styled cells to reduce allocations
                         let mut run_text = String::with_capacity(cols);
