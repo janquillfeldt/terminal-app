@@ -611,8 +611,16 @@ impl App for GuiApp {
                 ui.heading("TermiX");
                 ui.label(egui::RichText::new(" • GUI").color(egui::Color32::LIGHT_BLUE));
                 ui.separator();
-                ui.label("Modus:");
-                ui.label(match self.selected {0=>"Terminal",1=>"SSH",2=>"Markdown",3=>"Einstellungen",4=>"Über",5=>"Beenden", _=>"?"});
+                ui.label(format!("{}:", rust_i18n::t!("common.mode")));
+                ui.label(match self.selected {
+                    0 => rust_i18n::t!("menu.terminal").to_string(),
+                    1 => rust_i18n::t!("menu.ssh").to_string(),
+                    2 => rust_i18n::t!("menu.markdown").to_string(),
+                    3 => rust_i18n::t!("menu.settings").to_string(),
+                    4 => rust_i18n::t!("menu.about").to_string(),
+                    5 => rust_i18n::t!("menu.exit").to_string(),
+                    _ => "?".to_string()
+                });
             });
         });
 
@@ -630,17 +638,17 @@ impl App for GuiApp {
                     self.save_settings();
                 }
                 if !self.sidebar_collapsed {
-                    ui.heading("Hauptmenü");
+                    ui.heading(rust_i18n::t!("sidebar.main_menu").as_ref());
                 }
             });
             ui.separator();
             
             // Menu items with icons (top items)
             let top_items = [
-                ("💻", "Terminal", egui::Color32::from_rgb(0, 200, 120), 0),
-                ("🔌", "SSH", egui::Color32::from_rgb(100, 150, 255), 1),
-                ("📝", "Markdown", egui::Color32::from_rgb(255, 150, 50), 2),
-                ("⚙", "Einstellungen", egui::Color32::YELLOW, 3),
+                ("💻", rust_i18n::t!("menu.terminal"), egui::Color32::from_rgb(0, 200, 120), 0),
+                ("🔌", rust_i18n::t!("menu.ssh"), egui::Color32::from_rgb(100, 150, 255), 1),
+                ("📝", rust_i18n::t!("menu.markdown"), egui::Color32::from_rgb(255, 150, 50), 2),
+                ("⚙", rust_i18n::t!("menu.settings"), egui::Color32::YELLOW, 3),
             ];
             
             for (icon, label, color, idx) in top_items.iter() {
@@ -673,7 +681,7 @@ impl App for GuiApp {
                 // Collapse hint
                 if !self.sidebar_collapsed {
                     ui.add_space(5.0);
-                    ui.colored_label(egui::Color32::GRAY, "◀ Klicke zum Einklappen");
+                    ui.colored_label(egui::Color32::GRAY, rust_i18n::t!("sidebar.collapse_hint").as_ref());
                     ui.add_space(10.0);
                 }
                 
@@ -681,7 +689,7 @@ impl App for GuiApp {
                 let beenden_text = if self.sidebar_collapsed {
                     egui::RichText::new("🚪").size(24.0).color(egui::Color32::LIGHT_RED)
                 } else {
-                    egui::RichText::new("🚪 Beenden").color(egui::Color32::LIGHT_RED)
+                    egui::RichText::new(format!("🚪 {}", rust_i18n::t!("menu.exit"))).color(egui::Color32::LIGHT_RED)
                 };
                 let beenden_button = egui::Button::new(beenden_text);
                 let beenden_size = if self.sidebar_collapsed {
@@ -695,7 +703,7 @@ impl App for GuiApp {
                     self.selected = 5;
                 }
                 if self.selected == 5 && !self.sidebar_collapsed {
-                    ui.colored_label(egui::Color32::from_gray(140), "◀ aktiv");
+                    ui.colored_label(egui::Color32::from_gray(140), rust_i18n::t!("sidebar.active").as_ref());
                 }
                 
                 ui.separator();
@@ -704,7 +712,7 @@ impl App for GuiApp {
                 let ueber_text = if self.sidebar_collapsed {
                     egui::RichText::new("ℹ").size(24.0).color(egui::Color32::LIGHT_BLUE)
                 } else {
-                    egui::RichText::new("ℹ Über").color(egui::Color32::LIGHT_BLUE)
+                    egui::RichText::new(format!("ℹ {}", rust_i18n::t!("menu.about"))).color(egui::Color32::LIGHT_BLUE)
                 };
                 let ueber_button = egui::Button::new(ueber_text);
                 let ueber_size = if self.sidebar_collapsed {
@@ -726,7 +734,7 @@ impl App for GuiApp {
             ui.spacing_mut().item_spacing = egui::vec2(8.0, 8.0);
             match self.selected {
                 0 => {
-                    ui.heading("Terminal");
+                    ui.heading(rust_i18n::t!("menu.terminal").as_ref());
                     
                     // Tab bar for terminals
                     ui.horizontal(|ui| {
@@ -739,7 +747,7 @@ impl App for GuiApp {
                             ui.group(|ui| {
                                 // Tab label with drag + ctrl-click-to-close
                                 let label = egui::SelectableLabel::new(selected, &tab.name);
-                                let response = ui.add(label).on_hover_text("Strg+Klick: Schließen");
+                                let response = ui.add(label).on_hover_text(rust_i18n::t!("terminal.ctrl_click_to_close"));
                                 if response.hovered() {
                                     hovered_tab = Some(idx);
                                 }
@@ -769,11 +777,11 @@ impl App for GuiApp {
                                     }
                                 }
                                 ui.horizontal(|ui| {
-                                    if ui.small_button("✏").on_hover_text("Umbenennen").clicked() {
+                                    if ui.small_button("✏").on_hover_text(rust_i18n::t!("common.rename")).clicked() {
                                         to_rename = Some(idx);
                                     }
                                     if self.terminals.len() > 1
-                                        && ui.small_button("×").on_hover_text("Schließen (Strg+W)").clicked() {
+                                        && ui.small_button("×").on_hover_text(rust_i18n::t!("terminal.shortcuts.close")).clicked() {
                                             to_close = Some(idx);
                                         }
                                 });
@@ -788,7 +796,9 @@ impl App for GuiApp {
                                 self.active_terminal_tab = to_idx;
                             }
                         }
-                        if ui.button("➕ Neues Terminal").on_hover_text("Strg+T").clicked() {
+                        if ui.button(format!("➕ {}", rust_i18n::t!("terminal.new_terminal")))
+                            .on_hover_text(rust_i18n::t!("terminal.shortcuts.new"))
+                            .clicked() {
                             if let Ok(mut term) = TerminalView::new(self.scrollback_lines) {
                                 term.text_color = self.terminal_text_color;
                                 term.cursor_color = self.cursor_color;
@@ -811,7 +821,7 @@ impl App for GuiApp {
                                 }
                             }
                             ui.separator();
-                            if ui.button("Alle schließen außer aktuellem").clicked() {
+                            if ui.button(rust_i18n::t!("terminal.close_all_except_current")).clicked() {
                                 let keep = self.active_terminal_tab;
                                 if keep < self.terminals.len() {
                                     let keep_tab = self.terminals.remove(keep);
@@ -824,14 +834,18 @@ impl App for GuiApp {
                         });
                         
                         // Split buttons
-                        if ui.button("⬌ Split Horizontal").on_hover_text("Strg+H").clicked() {
+                        if ui.button(format!("⬌ {}", rust_i18n::t!("terminal.split_horizontal")))
+                            .on_hover_text(rust_i18n::t!("terminal.shortcuts.split_h"))
+                            .clicked() {
                             self.create_split(SplitOrientation::Horizontal);
                         }
-                        if ui.button("⬍ Split Vertikal").on_hover_text("Strg+Shift+V").clicked() {
+                        if ui.button(format!("⬍ {}", rust_i18n::t!("terminal.split_vertical")))
+                            .on_hover_text(rust_i18n::t!("terminal.shortcuts.split_v"))
+                            .clicked() {
                             self.create_split(SplitOrientation::Vertical);
                         }
                         
-                        ui.label(egui::RichText::new("Strg+W: Schließen | Strg+Tab: Wechseln | Strg+1-9: Split wechseln").small().color(egui::Color32::GRAY));
+                        ui.label(egui::RichText::new(rust_i18n::t!("terminal.shortcuts_info")).small().color(egui::Color32::GRAY));
                         
                         if let Some(idx) = to_rename {
                             self.terminal_rename_dialog = Some((idx, self.terminals[idx].name.clone()));
@@ -905,7 +919,7 @@ impl App for GuiApp {
                     }
                 }
                 1 => {
-                    ui.heading("SSH Verbindungen");
+                    ui.heading(rust_i18n::t!("menu.ssh").as_ref());
                     // Apply SSH text color only within this panel
                     let old = ui.visuals_mut().override_text_color;
                     ui.visuals_mut().override_text_color = Some(self.ssh_text_color);
@@ -913,7 +927,7 @@ impl App for GuiApp {
                     ui.visuals_mut().override_text_color = old;
                 }
                 2 => {
-                    ui.heading("Markdown Editor");
+                    ui.heading(rust_i18n::t!("menu.markdown").as_ref());
                     
                     // Tab bar for markdown editors
                     ui.horizontal(|ui| {
@@ -926,24 +940,24 @@ impl App for GuiApp {
                                     self.active_markdown_tab = idx;
                                 }
                                 ui.horizontal(|ui| {
-                                    if ui.small_button("✏").on_hover_text("Umbenennen").clicked() {
+                                    if ui.small_button("✏").on_hover_text(rust_i18n::t!("common.rename")).clicked() {
                                         to_rename = Some(idx);
                                     }
                                     if self.markdown_editors.len() > 1
-                                        && ui.small_button("×").on_hover_text("Schließen (Strg+W)").clicked() {
+                                        && ui.small_button("×").on_hover_text(rust_i18n::t!("terminal.shortcuts.close")).clicked() {
                                             to_close = Some(idx);
                                         }
                                 });
                             });
                         }
-                        if ui.button("➕ Neues Dokument").clicked() {
+                        if ui.button(format!("➕ {}", rust_i18n::t!("markdown.new_document"))).clicked() {
                             self.markdown_editors.push(MarkdownTab {
-                                name: format!("Dokument {}", self.markdown_editors.len() + 1),
+                                name: format!("{} {}", rust_i18n::t!("markdown.document"), self.markdown_editors.len() + 1),
                                 editor: MarkdownEditor::default(),
                             });
                             self.active_markdown_tab = self.markdown_editors.len() - 1;
                         }
-                        ui.label(egui::RichText::new("Strg+W: Schließen | Strg+Tab: Wechseln").small().color(egui::Color32::GRAY));
+                        ui.label(egui::RichText::new(rust_i18n::t!("markdown.shortcuts_info")).small().color(egui::Color32::GRAY));
                         
                         if let Some(idx) = to_rename {
                             self.markdown_rename_dialog = Some((idx, self.markdown_editors[idx].name.clone()));
@@ -968,12 +982,12 @@ impl App for GuiApp {
                     }
                 }
                 3 => {
-                    ui.heading("Einstellungen");
+                    ui.heading(rust_i18n::t!("menu.settings").as_ref());
                     ui.add_space(10.0);
                     
                     // Theme selection
                     ui.horizontal(|ui| {
-                        ui.label(egui::RichText::new("🎨 Theme:").strong());
+                        ui.label(egui::RichText::new(format!("🎨 {}:", rust_i18n::t!("settings.theme"))).strong());
                         egui::ComboBox::from_id_source("theme_selector")
                             .selected_text(self.current_theme.name())
                             .show_ui(ui, |ui| {
@@ -1010,10 +1024,10 @@ impl App for GuiApp {
 
                     // Per-view text colors
                     ui.group(|ui| {
-                        ui.label(egui::RichText::new("Farben pro Bereich:").strong());
+                        ui.label(egui::RichText::new(rust_i18n::t!("settings.colors_per_area")).strong());
                         ui.add_space(6.0);
                         ui.horizontal(|ui| {
-                            ui.label("Terminal Textfarbe:");
+                            ui.label(format!("{}:", rust_i18n::t!("settings.terminal_text_color")));
                             let mut c = self.terminal_text_color;
                             if ui.color_edit_button_srgba(&mut c).changed() {
                                 self.terminal_text_color = c;
@@ -1025,7 +1039,7 @@ impl App for GuiApp {
                             }
                         });
                         ui.horizontal(|ui| {
-                            ui.label("Markdown Textfarbe:");
+                            ui.label(format!("{}:", rust_i18n::t!("settings.markdown_text_color")));
                             let mut c = self.markdown_text_color;
                             if ui.color_edit_button_srgba(&mut c).changed() {
                                 self.markdown_text_color = c;
@@ -1033,7 +1047,7 @@ impl App for GuiApp {
                             }
                         });
                         ui.horizontal(|ui| {
-                            ui.label("SSH Textfarbe:");
+                            ui.label(format!("{}:", rust_i18n::t!("settings.ssh_text_color")));
                             let mut c = self.ssh_text_color;
                             if ui.color_edit_button_srgba(&mut c).changed() {
                                 self.ssh_text_color = c;
@@ -1041,7 +1055,7 @@ impl App for GuiApp {
                             }
                         });
                         ui.horizontal(|ui| {
-                            ui.label("Cursor Farbe:");
+                            ui.label(format!("{}:", rust_i18n::t!("settings.cursor_color")));
                             let mut c = self.cursor_color;
                             if ui.color_edit_button_srgba(&mut c).changed() {
                                 self.cursor_color = c;
@@ -1060,10 +1074,10 @@ impl App for GuiApp {
 
                     // Cursor settings
                     ui.group(|ui| {
-                        ui.label(egui::RichText::new("Cursor Einstellungen:").strong());
+                        ui.label(egui::RichText::new(rust_i18n::t!("settings.cursor_settings")).strong());
                         ui.add_space(6.0);
                         ui.horizontal(|ui| {
-                            ui.label("Cursor Form:");
+                            ui.label(format!("{}:", rust_i18n::t!("settings.cursor_shape")));
                             egui::ComboBox::from_id_source("cursor_shape")
                                 .selected_text(self.cursor_shape.name())
                                 .show_ui(ui, |ui| {
@@ -1082,7 +1096,7 @@ impl App for GuiApp {
                         });
                         ui.horizontal(|ui| {
                             let mut blink = self.cursor_blinking;
-                            if ui.checkbox(&mut blink, "Cursor blinken").changed() {
+                            if ui.checkbox(&mut blink, rust_i18n::t!("settings.cursor_blink").as_ref()).changed() {
                                 self.cursor_blinking = blink;
                                 // Apply to all terminal tabs
                                 for t in &mut self.terminals {
@@ -1099,22 +1113,26 @@ impl App for GuiApp {
 
                     // Global font selection
                     ui.group(|ui| {
-                        ui.label(egui::RichText::new("Schriftart (global):").strong());
+                        ui.label(egui::RichText::new(rust_i18n::t!("settings.font_global")).strong());
                         ui.add_space(6.0);
                         egui::ComboBox::from_id_source("font_mode")
-                            .selected_text(match self.font_mode { FontMode::Default => "Standard", FontMode::MonospaceEverywhere => "Monospace überall", FontMode::Custom(_) => "Benutzerdefiniert" })
+                            .selected_text(match self.font_mode { 
+                                FontMode::Default => rust_i18n::t!("fonts.default"), 
+                                FontMode::MonospaceEverywhere => rust_i18n::t!("fonts.monospace_everywhere"), 
+                                FontMode::Custom(_) => rust_i18n::t!("fonts.custom")
+                            })
                             .show_ui(ui, |ui| {
-                                if ui.selectable_label(matches!(self.font_mode, FontMode::Default), "Standard").clicked() {
+                                if ui.selectable_label(matches!(self.font_mode, FontMode::Default), rust_i18n::t!("fonts.default").as_ref()).clicked() {
                                     self.font_mode = FontMode::Default;
                                     self.custom_font_info = None;
                                     self.save_settings();
                                 }
-                                if ui.selectable_label(matches!(self.font_mode, FontMode::MonospaceEverywhere), "Monospace überall").clicked() {
+                                if ui.selectable_label(matches!(self.font_mode, FontMode::MonospaceEverywhere), rust_i18n::t!("fonts.monospace_everywhere").as_ref()).clicked() {
                                     self.font_mode = FontMode::MonospaceEverywhere;
                                     self.custom_font_info = None;
                                     self.save_settings();
                                 }
-                                if ui.selectable_label(matches!(self.font_mode, FontMode::Custom(_)), "Benutzerdefiniert").clicked() {
+                                if ui.selectable_label(matches!(self.font_mode, FontMode::Custom(_)), rust_i18n::t!("fonts.custom").as_ref()).clicked() {
                                     self.font_mode = FontMode::Custom(String::new());
                                     self.save_settings();
                                 }
@@ -1122,7 +1140,7 @@ impl App for GuiApp {
 
                         if matches!(self.font_mode, FontMode::Custom(_)) {
                             ui.horizontal(|ui| {
-                                if ui.button("📁 Schrift laden (.ttf/.otf)").clicked() {
+                                if ui.button(rust_i18n::t!("fonts.load_font")).clicked() {
                                     if let Some(path) = rfd::FileDialog::new().add_filter("Font", &["ttf", "otf"]).pick_file() {
                                         if let Ok(bytes) = std::fs::read(&path) {
                                             let mut defs = egui::FontDefinitions::default();
@@ -1138,8 +1156,8 @@ impl App for GuiApp {
                                     }
                                 }
                                 if let Some(info) = &self.custom_font_info {
-                                    ui.label(format!("Aktiv: {}", info));
-                                    if ui.button("Zurücksetzen").clicked() {
+                                    ui.label(format!("{}: {}", rust_i18n::t!("fonts.active"), info));
+                                    if ui.button(rust_i18n::t!("common.reset")).clicked() {
                                         self.custom_font_info = None;
                                         self.font_mode = FontMode::Default;
                                         self.save_settings();
@@ -1262,21 +1280,21 @@ impl App for GuiApp {
                     });
                 }
                 4 => {
-                    ui.heading("Über TermiX");
+                    ui.heading(format!("{} TermiX", rust_i18n::t!("menu.about")));
                     ui.add_space(10.0);
-                    ui.label(egui::RichText::new("TermiX - Modern Terminal Application").size(18.0).strong());
-                    ui.label("Version 0.1.0");
-                    ui.add_space(10.0);
-                    ui.separator();
-                    ui.heading("Features:");
-                    ui.label("✓ Multi-Tab Terminal & Markdown Editor");
-                    ui.label("✓ Smart Command Suggestions (50+ Befehle)");
-                    ui.label("✓ SSH Connection Manager");
-                    ui.label("✓ Cross-Platform (Linux & Windows)");
-                    ui.label("✓ Dual Interface (TUI & GUI)");
+                    ui.label(egui::RichText::new(rust_i18n::t!("about.subtitle")).size(18.0).strong());
+                    ui.label(format!("{} 0.1.0", rust_i18n::t!("about.version")));
                     ui.add_space(10.0);
                     ui.separator();
-                    ui.heading("Technologie:");
+                    ui.heading(format!("{}:", rust_i18n::t!("about.features")));
+                    ui.label(format!("✓ {}", rust_i18n::t!("about.feature_multi_tab")));
+                    ui.label(format!("✓ {}", rust_i18n::t!("about.feature_suggestions")));
+                    ui.label(format!("✓ {}", rust_i18n::t!("about.feature_ssh")));
+                    ui.label(format!("✓ {}", rust_i18n::t!("about.feature_cross_platform")));
+                    ui.label(format!("✓ {}", rust_i18n::t!("about.feature_dual_interface")));
+                    ui.add_space(10.0);
+                    ui.separator();
+                    ui.heading(format!("{}:", rust_i18n::t!("about.technology")));
                     ui.label("• TUI: Crossterm");
                     ui.label("• GUI: egui/eframe");
                     ui.label("• Terminal: portable-pty + vt100");
@@ -1284,8 +1302,8 @@ impl App for GuiApp {
                     ui.label("• Markdown: pulldown-cmark");
                     ui.add_space(10.0);
                     ui.separator();
-                    ui.heading("Support:");
-                    ui.label("Wenn du TermiX nützlich findest, unterstütze die Entwicklung:");
+                    ui.heading(format!("{}:", rust_i18n::t!("about.support")));
+                    ui.label(rust_i18n::t!("about.support_text").as_ref());
                     ui.add_space(5.0);
                     
                     // Buy Me a Coffee styled button
@@ -1298,14 +1316,14 @@ impl App for GuiApp {
                         .stroke(egui::Stroke::new(2.0, egui::Color32::BLACK))
                         .rounding(egui::Rounding::same(8.0));
                     
-                    if ui.add_sized([200.0, 40.0], button).on_hover_text("Öffnet buymeacoffee.com/janquillfeldt").clicked() {
+                    if ui.add_sized([200.0, 40.0], button).on_hover_text(rust_i18n::t!("about.support_link")).clicked() {
                         let _ = open::that("https://buymeacoffee.com/janquillfeldt");
                     }
                 }
                 5 => {
-                    ui.heading("Beenden");
-                    ui.label("Schließt das Programm.");
-                    if ui.button("Fenster schließen").clicked() {
+                    ui.heading(rust_i18n::t!("menu.exit").as_ref());
+                    ui.label(rust_i18n::t!("exit.description").as_ref());
+                    if ui.button(rust_i18n::t!("exit.close_window").as_ref()).clicked() {
                         ui.ctx().send_viewport_cmd(egui::ViewportCommand::Close);
                     }
                 }
@@ -1316,23 +1334,23 @@ impl App for GuiApp {
         // Terminal rename dialog
         let mut close_rename_dialog = false;
         if let Some((idx, ref mut new_name)) = self.terminal_rename_dialog {
-            egui::Window::new("Terminal umbenennen")
+            egui::Window::new(rust_i18n::t!("dialogs.rename_terminal").as_ref())
                 .collapsible(false)
                 .resizable(false)
                 .show(ctx, |ui| {
                     ui.horizontal(|ui| {
-                        ui.label("Neuer Name:");
+                        ui.label(format!("{}:", rust_i18n::t!("dialogs.new_name")));
                         ui.text_edit_singleline(new_name);
                     });
                     ui.separator();
                     ui.horizontal(|ui| {
-                        if ui.button("✓ Speichern").clicked() {
+                        if ui.button(format!("✓ {}", rust_i18n::t!("common.save"))).clicked() {
                             if idx < self.terminals.len() {
                                 self.terminals[idx].name = new_name.clone();
                             }
                             close_rename_dialog = true;
                         }
-                        if ui.button("✗ Abbrechen").clicked() {
+                        if ui.button(format!("✗ {}", rust_i18n::t!("common.cancel"))).clicked() {
                             close_rename_dialog = true;
                         }
                     });
@@ -1345,23 +1363,23 @@ impl App for GuiApp {
         // Markdown rename dialog
         let mut close_markdown_rename_dialog = false;
         if let Some((idx, ref mut new_name)) = self.markdown_rename_dialog {
-            egui::Window::new("Markdown-Dokument umbenennen")
+            egui::Window::new(rust_i18n::t!("dialogs.rename_markdown").as_ref())
                 .collapsible(false)
                 .resizable(false)
                 .show(ctx, |ui| {
                     ui.horizontal(|ui| {
-                        ui.label("Neuer Name:");
+                        ui.label(format!("{}:", rust_i18n::t!("dialogs.new_name")));
                         ui.text_edit_singleline(new_name);
                     });
                     ui.separator();
                     ui.horizontal(|ui| {
-                        if ui.button("✓ Speichern").clicked() {
+                        if ui.button(format!("✓ {}", rust_i18n::t!("common.save"))).clicked() {
                             if idx < self.markdown_editors.len() {
                                 self.markdown_editors[idx].name = new_name.clone();
                             }
                             close_markdown_rename_dialog = true;
                         }
-                        if ui.button("✗ Abbrechen").clicked() {
+                        if ui.button(format!("✗ {}", rust_i18n::t!("common.cancel"))).clicked() {
                             close_markdown_rename_dialog = true;
                         }
                     });
